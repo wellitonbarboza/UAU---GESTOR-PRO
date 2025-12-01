@@ -1,32 +1,31 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 
-const missingEnv = !supabaseUrl || !supabaseAnonKey;
+export const isSupabaseEnabled = Boolean(supabaseUrl && supabaseAnonKey);
 
-if (missingEnv) {
+if (!isSupabaseEnabled) {
   console.warn(
-    'Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are missing; Supabase features are disabled.'
+    '[Supabase] Variáveis ausentes. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no ambiente (Netlify) e faça redeploy.'
   );
 }
 
-export const supabase: SupabaseClient | undefined =
-  !missingEnv && supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          autoRefreshToken: true,
-          persistSession: true
-        }
-      })
-    : undefined;
+export const supabase: SupabaseClient | null = isSupabaseEnabled
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null;
 
-export function getSupabaseClient(): SupabaseClient {
+export function requireSupabaseClient(): SupabaseClient {
   if (!supabase) {
     throw new Error(
-      'Supabase environment variables are not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before enabling Supabase features.'
+      'Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY e faça redeploy.'
     );
   }
-
   return supabase;
 }
