@@ -26,6 +26,7 @@ function DadosUpload() {
   const [persisting, setPersisting] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
   const [persistMessage, setPersistMessage] = useState<string | null>(null);
+  const [companyIdInput, setCompanyIdInput] = useState('');
 
   const totaisDesembolso = useMemo(() => {
     const desembolsos = canonical?.desembolsos || [];
@@ -67,6 +68,17 @@ function DadosUpload() {
     [companyMetadata]
   );
 
+  const effectiveCompanyId = useMemo(
+    () => (companyIdInput || inferredCompanyId || '').trim(),
+    [companyIdInput, inferredCompanyId]
+  );
+
+  useEffect(() => {
+    if (inferredCompanyId) {
+      setCompanyIdInput((current) => current || inferredCompanyId);
+    }
+  }, [inferredCompanyId]);
+
   const processar = () => {
     if (!importResult) return;
     const canonicalized = canonicalize(importResult);
@@ -75,8 +87,8 @@ function DadosUpload() {
 
   const persistirSupabase = async () => {
     if (!importResult) return;
-    if (!inferredCompanyId) {
-      setPersistError('Não foi possível identificar o company_id na planilha.');
+    if (!effectiveCompanyId) {
+      setPersistError('Informe manualmente o company_id ou envie uma planilha válida.');
       return;
     }
 
@@ -87,7 +99,7 @@ function DadosUpload() {
     setPersistMessage(null);
 
     try {
-      const batch = await persistBatch(inferredCompanyId, importResult, canonicalized);
+      const batch = await persistBatch(effectiveCompanyId, importResult, canonicalized);
       setPersistMessage(`Importado com sucesso (batch ${batch.id}).`);
     } catch (err) {
       setPersistError((err as Error).message);
@@ -161,9 +173,16 @@ function DadosUpload() {
         }
         actions={
           <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={companyIdInput}
+              onChange={(e) => setCompanyIdInput(e.target.value)}
+              placeholder={inferredCompanyId ? `Detectado: ${inferredCompanyId}` : 'Informe o company_id'}
+              className="px-2 py-2 text-sm border rounded"
+            />
             <button
               onClick={persistirSupabase}
-              disabled={!importResult || !isSupabaseEnabled || persisting || !inferredCompanyId}
+              disabled={!importResult || !isSupabaseEnabled || persisting || !effectiveCompanyId}
               className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-40"
             >
               {persisting ? 'Salvando...' : 'Salvar no Supabase'}
@@ -201,8 +220,8 @@ function DadosUpload() {
         }
         actions={
           <button
-            onClick={() => loadFromSupabase(companyId.trim())}
-            disabled={!companyId.trim() || !isSupabaseEnabled || loadingSupabase}
+            onClick={() => loadFromSupabase(effectiveCompanyId)}
+            disabled={!effectiveCompanyId || !isSupabaseEnabled || loadingSupabase}
             className="px-3 py-2 rounded bg-primary text-white disabled:opacity-40"
           >
             {loadingSupabase ? 'Buscando...' : 'Usar Supabase como fonte'}
