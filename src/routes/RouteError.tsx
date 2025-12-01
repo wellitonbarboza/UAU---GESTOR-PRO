@@ -10,7 +10,10 @@ function formatUnknownError(error: unknown): { title: string; details: string } 
   }
 
   if (error instanceof Error) {
-    return { title: error.name || 'Erro', details: error.message || String(error) };
+    return {
+      title: error.name || 'Erro',
+      details: error.stack || error.message || String(error)
+    };
   }
 
   return { title: 'Erro', details: typeof error === 'string' ? error : JSON.stringify(error, null, 2) };

@@ -1,6 +1,5 @@
 import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
-import AppShell from '../layout/AppShell';
 import { paths } from './paths';
 import RouteError from './RouteError';
 
@@ -15,6 +14,8 @@ function ScreenLoader() {
 function withSuspense(element: React.ReactElement) {
   return <Suspense fallback={<ScreenLoader />}>{element}</Suspense>;
 }
+
+const AppShell = lazy(() => import('../layout/AppShell'));
 
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const DadosUpload = lazy(() => import('../pages/DadosUpload'));
@@ -40,7 +41,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: <AppShell />,
+    element: withSuspense(<AppShell />),
     errorElement: <RouteError />,
     children: [
       { index: true, element: withSuspense(<Dashboard />) },

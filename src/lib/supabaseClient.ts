@@ -21,6 +21,10 @@ export const supabase: SupabaseClient | null = isSupabaseEnabled
     })
   : null;
 
+export function getSupabaseClient(): SupabaseClient | null {
+  return supabase;
+}
+
 export function requireSupabaseClient(): SupabaseClient {
   if (!supabase) {
     throw new Error(
