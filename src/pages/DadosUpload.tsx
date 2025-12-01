@@ -10,7 +10,16 @@ import { isSupabaseEnabled } from '../lib/supabaseClient';
 import { CompanyMetadata, extractCompanyMetadata } from '../lib/uau/company';
 
 function DadosUpload() {
-  const { importResult, setImportResult, canonical, setCanonical } = useImportStore();
+  const {
+    importResult,
+    setImportResult,
+    canonical,
+    setCanonical,
+    loadFromSupabase,
+    loadingSupabase,
+    supabaseError,
+    supabaseBatchId
+  } = useImportStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [companyMetadata, setCompanyMetadata] = useState<CompanyMetadata | null>(null);
@@ -107,7 +116,7 @@ function DadosUpload() {
 
       <Card
         title="Processar"
-        description="Gera base RAW + canônica para uso nas demais telas."
+        description="Processa localmente para gravar no Supabase (fonte principal das demais telas)."
         actions={
           <button
             onClick={processar}
@@ -166,6 +175,35 @@ function DadosUpload() {
           {!isSupabaseEnabled && (
             <div className="text-slate-600">Defina as variáveis de ambiente para ativar a persistência.</div>
           )}
+        </div>
+      </Card>
+
+      <Card
+        title="Carregar base do Supabase"
+        description={
+          isSupabaseEnabled
+            ? 'Busca o canônico diretamente das tabelas do Supabase para uso nas demais telas.'
+            : 'Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para habilitar a leitura.'
+        }
+        actions={
+          <button
+            onClick={() => loadFromSupabase(companyId.trim())}
+            disabled={!companyId.trim() || !isSupabaseEnabled || loadingSupabase}
+            className="px-3 py-2 rounded bg-primary text-white disabled:opacity-40"
+          >
+            {loadingSupabase ? 'Buscando...' : 'Usar Supabase como fonte'}
+          </button>
+        }
+      >
+        <div className="text-sm text-slate-700 space-y-2">
+          <p className="text-slate-600">
+            As demais telas passam a ler apenas os dados armazenados no Supabase. Informe o mesmo company_id
+            utilizado no upload para sincronizar.
+          </p>
+          {supabaseBatchId && (
+            <div className="text-emerald-700">Canônico carregado do Supabase (batch {supabaseBatchId}).</div>
+          )}
+          {supabaseError && <div className="text-rose-600">{supabaseError}</div>}
         </div>
       </Card>
     </div>
