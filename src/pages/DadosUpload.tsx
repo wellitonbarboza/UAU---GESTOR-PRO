@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Card from '../ui/Card';
 import Table from '../ui/Table';
 import { requiredSheets } from '../lib/uau/sheetMap';
@@ -7,12 +7,13 @@ import { readWorkbook } from '../lib/uau/importer';
 import { useImportStore } from '../store/useImportStore';
 import { persistBatch } from '../lib/uau/persist';
 import { isSupabaseEnabled } from '../lib/supabaseClient';
+import { CompanyMetadata, extractCompanyMetadata } from '../lib/uau/company';
 
 function DadosUpload() {
   const { importResult, setImportResult, canonical, setCanonical } = useImportStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [companyId, setCompanyId] = useState('');
+  const [companyMetadata, setCompanyMetadata] = useState<CompanyMetadata | null>(null);
   const [persisting, setPersisting] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
   const [persistMessage, setPersistMessage] = useState<string | null>(null);
@@ -31,6 +32,21 @@ function DadosUpload() {
     }
   };
 
+  useEffect(() => {
+    if (!importResult) {
+      setCompanyMetadata(null);
+      return;
+    }
+
+    const metadata = extractCompanyMetadata(importResult);
+    setCompanyMetadata(metadata);
+  }, [importResult]);
+
+  const inferredCompanyId = useMemo(
+    () => companyMetadata?.codigo_empresa || '',
+    [companyMetadata]
+  );
+
   const processar = () => {
     if (!importResult) return;
     const canonicalized = canonicalize(importResult);
@@ -39,8 +55,8 @@ function DadosUpload() {
 
   const persistirSupabase = async () => {
     if (!importResult) return;
-    if (!companyId.trim()) {
-      setPersistError('Informe o company_id que será usado no Supabase.');
+    if (!inferredCompanyId) {
+      setPersistError('Não foi possível identificar o company_id na planilha.');
       return;
     }
 
@@ -51,7 +67,7 @@ function DadosUpload() {
     setPersistMessage(null);
 
     try {
-      const batch = await persistBatch(companyId.trim(), importResult, canonicalized);
+      const batch = await persistBatch(inferredCompanyId, importResult, canonicalized);
       setPersistMessage(`Importado com sucesso (batch ${batch.id}).`);
     } catch (err) {
       setPersistError((err as Error).message);
@@ -117,22 +133,14 @@ function DadosUpload() {
         title="Salvar no Supabase"
         description={
           isSupabaseEnabled
-            ? 'Importa todas as abas para as tabelas do Supabase e vincula ao company_id informado.'
+            ? 'Importa todas as abas para as tabelas do Supabase e vincula ao company_id detectado.'
             : 'Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para habilitar a persistência.'
         }
         actions={
           <div className="flex gap-2 items-center">
-            <input
-              type="text"
-              className="border border-slate-200 rounded px-2 py-1 text-sm"
-              placeholder="company_id"
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
-              disabled={!isSupabaseEnabled}
-            />
             <button
               onClick={persistirSupabase}
-              disabled={!importResult || !isSupabaseEnabled || persisting}
+              disabled={!importResult || !isSupabaseEnabled || persisting || !inferredCompanyId}
               className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-40"
             >
               {persisting ? 'Salvando...' : 'Salvar no Supabase'}
@@ -142,6 +150,17 @@ function DadosUpload() {
       >
         <div className="text-sm text-slate-700 space-y-2">
           <div className="text-slate-600">O arquivo completo (todas as abas) será inserido no Supabase.</div>
+          {companyMetadata && (
+            <div className="text-slate-700">
+              Empresa detectada: {companyMetadata.codigo_empresa || 'N/A'} -{' '}
+              {companyMetadata.descricao_empresa || 'Sem descrição'}
+              {companyMetadata.codigo_obra ? ` | Obra: ${companyMetadata.codigo_obra}` : ''}
+              {companyMetadata.centro_custos ? ` | Centro de custos: ${companyMetadata.centro_custos}` : ''}
+            </div>
+          )}
+          {!companyMetadata && importResult && (
+            <div className="text-amber-600">Não foi possível identificar os dados da empresa.</div>
+          )}
           {persistMessage && <div className="text-emerald-700">{persistMessage}</div>}
           {persistError && <div className="text-rose-600">{persistError}</div>}
           {!isSupabaseEnabled && (

@@ -19,6 +19,10 @@ export const sheetColumns: Record<SheetKey, Record<string, string>> = {
     M: 'descricao'
   },
   '223-PLANEJ.CONTRA.INSUMOS': {
+    B: 'codigo_empresa',
+    C: 'descricao_empresa',
+    D: 'codigo_obra',
+    E: 'centro_custos',
     G: 'codigo_servico',
     H: 'descricao',
     I: 'valor_contrato',
