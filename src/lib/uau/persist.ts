@@ -1,8 +1,10 @@
-import { supabase } from '../supabaseClient';
+import { getSupabaseClient } from '../supabaseClient';
 import { CanonicalData } from './canonicalize';
 import { ImportResult } from './importer';
 
 export async function persistBatch(companyId: string, importResult: ImportResult, canonical: CanonicalData) {
+  const supabase = getSupabaseClient();
+
   const { data: batch, error } = await supabase
     .from('uau_import_batches')
     .insert({ company_id: companyId, workbook_name: importResult.workbookName })
