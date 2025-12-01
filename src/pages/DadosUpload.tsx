@@ -5,11 +5,17 @@ import { requiredSheets } from '../lib/uau/sheetMap';
 import { canonicalize } from '../lib/uau/canonicalize';
 import { readWorkbook } from '../lib/uau/importer';
 import { useImportStore } from '../store/useImportStore';
+import { persistBatch } from '../lib/uau/persist';
+import { isSupabaseEnabled } from '../lib/supabaseClient';
 
 function DadosUpload() {
   const { importResult, setImportResult, canonical, setCanonical } = useImportStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState('');
+  const [persisting, setPersisting] = useState(false);
+  const [persistError, setPersistError] = useState<string | null>(null);
+  const [persistMessage, setPersistMessage] = useState<string | null>(null);
 
   const handleFile = async (file?: File) => {
     if (!file) return;
@@ -29,6 +35,29 @@ function DadosUpload() {
     if (!importResult) return;
     const canonicalized = canonicalize(importResult);
     setCanonical(canonicalized);
+  };
+
+  const persistirSupabase = async () => {
+    if (!importResult) return;
+    if (!companyId.trim()) {
+      setPersistError('Informe o company_id que será usado no Supabase.');
+      return;
+    }
+
+    const canonicalized = canonical || canonicalize(importResult);
+    setCanonical(canonicalized);
+    setPersisting(true);
+    setPersistError(null);
+    setPersistMessage(null);
+
+    try {
+      const batch = await persistBatch(companyId.trim(), importResult, canonicalized);
+      setPersistMessage(`Importado com sucesso (batch ${batch.id}).`);
+    } catch (err) {
+      setPersistError((err as Error).message);
+    } finally {
+      setPersisting(false);
+    }
   };
 
   return (
@@ -62,7 +91,7 @@ function DadosUpload() {
 
       <Card
         title="Processar"
-        description="Gera base RAW + canônica; a persistência no Supabase é feita via helpers."
+        description="Gera base RAW + canônica para uso nas demais telas."
         actions={
           <button
             onClick={processar}
@@ -82,6 +111,43 @@ function DadosUpload() {
         ) : (
           <div className="text-sm text-slate-500">Nenhum canônico gerado.</div>
         )}
+      </Card>
+
+      <Card
+        title="Salvar no Supabase"
+        description={
+          isSupabaseEnabled
+            ? 'Importa todas as abas para as tabelas do Supabase e vincula ao company_id informado.'
+            : 'Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para habilitar a persistência.'
+        }
+        actions={
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              className="border border-slate-200 rounded px-2 py-1 text-sm"
+              placeholder="company_id"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+              disabled={!isSupabaseEnabled}
+            />
+            <button
+              onClick={persistirSupabase}
+              disabled={!importResult || !isSupabaseEnabled || persisting}
+              className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-40"
+            >
+              {persisting ? 'Salvando...' : 'Salvar no Supabase'}
+            </button>
+          </div>
+        }
+      >
+        <div className="text-sm text-slate-700 space-y-2">
+          <div className="text-slate-600">O arquivo completo (todas as abas) será inserido no Supabase.</div>
+          {persistMessage && <div className="text-emerald-700">{persistMessage}</div>}
+          {persistError && <div className="text-rose-600">{persistError}</div>}
+          {!isSupabaseEnabled && (
+            <div className="text-slate-600">Defina as variáveis de ambiente para ativar a persistência.</div>
+          )}
+        </div>
       </Card>
     </div>
   );
