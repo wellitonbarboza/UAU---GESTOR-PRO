@@ -7,13 +7,27 @@ export interface CompanyMetadata {
   centro_custos?: string;
 }
 
+export function generateCompanyId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  const template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+  return template.replace(/[xy]/g, (char) => {
+    const rand = (Math.random() * 16) | 0;
+    const value = char === 'x' ? rand : (rand & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 function normalize(value: unknown) {
   if (value === undefined || value === null) return undefined;
   return String(value).trim();
 }
 
-export function extractCompanyMetadata(importResult: ImportResult): CompanyMetadata | null {
+export function extractCompanyMetadata(importResult: ImportResult): CompanyMetadata {
   const sheetEntries = Object.values(importResult.sheets || {});
+  const metadata: CompanyMetadata = {};
 
   for (const rows of sheetEntries) {
     for (const row of rows) {
@@ -23,11 +37,21 @@ export function extractCompanyMetadata(importResult: ImportResult): CompanyMetad
       const codigo_obra = normalize(values.codigo_obra);
       const centro_custos = normalize(values.centro_custos);
 
-      if (codigo_empresa || descricao_empresa || codigo_obra || centro_custos) {
-        return { codigo_empresa, descricao_empresa, codigo_obra, centro_custos };
+      if (!metadata.codigo_empresa && codigo_empresa) metadata.codigo_empresa = codigo_empresa;
+      if (!metadata.descricao_empresa && descricao_empresa) metadata.descricao_empresa = descricao_empresa;
+      if (!metadata.codigo_obra && codigo_obra) metadata.codigo_obra = codigo_obra;
+      if (!metadata.centro_custos && centro_custos) metadata.centro_custos = centro_custos;
+
+      const hasAll = metadata.codigo_empresa && metadata.descricao_empresa && metadata.codigo_obra && metadata.centro_custos;
+      if (hasAll) {
+        break;
       }
     }
   }
 
-  return null;
+  if (!metadata.codigo_empresa) {
+    metadata.codigo_empresa = generateCompanyId();
+  }
+
+  return metadata;
 }
