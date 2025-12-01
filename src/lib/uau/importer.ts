@@ -25,7 +25,7 @@ export function readWorkbook(file: File): Promise<ImportResult> {
       requiredSheets.forEach((sheet) => {
         const ws = workbook.Sheets[sheet];
         if (!ws) return;
-        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 'A' });
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 'A', range: 1 });
         const mapped = json.map((row) => normalizeRow(sheet, row));
         sheets[sheet] = mapped.map((values) => ({ sheet, values }));
       });
