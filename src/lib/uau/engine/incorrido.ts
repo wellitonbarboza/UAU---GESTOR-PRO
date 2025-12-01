@@ -1,9 +1,6 @@
-export interface ProcessoFinanceiro {
-  processo?: string | number;
-  fornecedor?: string;
-  valor?: number;
-  contrato?: string | number;
-}
+import { ProcessoFinanceiro } from '../canonicalize';
+
+export type { ProcessoFinanceiro };
 
 export function calcularIncorrido(processos: ProcessoFinanceiro[]) {
   return processos.reduce((sum, p) => sum + (p.valor || 0), 0);

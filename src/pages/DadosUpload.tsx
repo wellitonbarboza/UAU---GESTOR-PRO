@@ -18,6 +18,17 @@ function DadosUpload() {
   const [persistError, setPersistError] = useState<string | null>(null);
   const [persistMessage, setPersistMessage] = useState<string | null>(null);
 
+  const totaisDesembolso = useMemo(() => {
+    const desembolsos = canonical?.desembolsos || [];
+    return desembolsos.reduce(
+      (acc, item) => ({
+        pagos: acc.pagos + (item.pagos || 0),
+        aPagar: acc.aPagar + (item.a_pagar || 0)
+      }),
+      { pagos: 0, aPagar: 0 }
+    );
+  }, [canonical]);
+
   const handleFile = async (file?: File) => {
     if (!file) return;
     setError(null);
@@ -123,6 +134,9 @@ function DadosUpload() {
             <div>Fornecedores: {Object.keys(canonical.fornecedores).length}</div>
             <div>Contratos: {Object.keys(canonical.contratos).length}</div>
             <div>Processos: {canonical.processos.length}</div>
+            <div>Desembolsos (aba 260): {canonical.desembolsos.length}</div>
+            <div>Total pagos: R$ {totaisDesembolso.pagos.toLocaleString('pt-BR')}</div>
+            <div>Total a pagar: R$ {totaisDesembolso.aPagar.toLocaleString('pt-BR')}</div>
           </div>
         ) : (
           <div className="text-sm text-slate-500">Nenhum canônico gerado.</div>
