@@ -1,47 +1,64 @@
-// src/routes/index.tsx
-import React from "react";
-import { createBrowserRouter } from "react-router-dom";
-import AppShell from "../layout/AppShell";
-import RouteError from "./RouteError";
-import { paths } from "./paths";
+import React, { Suspense, lazy } from 'react';
+import { createBrowserRouter } from 'react-router-dom';
+import AppShell from '../layout/AppShell';
+import { paths } from './paths';
+import RouteError from './RouteError';
 
-const lazyPage = (loader: () => Promise<any>) => ({
-  async lazy() {
-    const mod = await loader();
-    return { Component: mod.default };
-  },
-});
+function ScreenLoader() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center p-6 text-slate-600">
+      Carregando...
+    </div>
+  );
+}
+
+function withSuspense(element: React.ReactElement) {
+  return <Suspense fallback={<ScreenLoader />}>{element}</Suspense>;
+}
+
+const Dashboard = lazy(() => import('../pages/Dashboard'));
+const DadosUpload = lazy(() => import('../pages/DadosUpload'));
+const Obras = lazy(() => import('../pages/Obras'));
+
+const AnaliseNovo = lazy(() => import('../pages/Contratos/AnaliseNovo'));
+const AnaliseAditivo = lazy(() => import('../pages/Contratos/AnaliseAditivo'));
+const Distrato = lazy(() => import('../pages/Contratos/Distrato'));
+const Consulta = lazy(() => import('../pages/Contratos/Consulta'));
+const Equalizacao = lazy(() => import('../pages/Contratos/Equalizacao'));
+
+const NovoPedido = lazy(() => import('../pages/Suprimentos/NovoPedido'));
+const ConsultaInsumos = lazy(() => import('../pages/Suprimentos/ConsultaInsumos'));
+
+const Historico = lazy(() => import('../pages/Historico'));
+const Auth = lazy(() => import('../pages/Auth'));
 
 const router = createBrowserRouter([
   {
     path: paths.auth,
-    errorElement: <RouteError />,
-    ...lazyPage(() => import("../pages/Auth")),
+    element: withSuspense(<Auth />),
+    errorElement: <RouteError />
   },
   {
-    path: "/",
-    Component: AppShell,
+    path: '/',
+    element: <AppShell />,
     errorElement: <RouteError />,
     children: [
-      { index: true, ...lazyPage(() => import("../pages/Dashboard")) },
+      { index: true, element: withSuspense(<Dashboard />) },
 
-      // Suprimentos
-      { path: paths.suprimentos.dados, ...lazyPage(() => import("../pages/DadosUpload")) },
-      { path: paths.suprimentos.obras, ...lazyPage(() => import("../pages/Obras")) },
-      { path: paths.suprimentos.novoPedido, ...lazyPage(() => import("../pages/Suprimentos/NovoPedido")) },
-      { path: paths.suprimentos.consultaInsumos, ...lazyPage(() => import("../pages/Suprimentos/ConsultaInsumos")) },
+      { path: paths.suprimentos.dados, element: withSuspense(<DadosUpload />) },
+      { path: paths.suprimentos.obras, element: withSuspense(<Obras />) },
+      { path: paths.suprimentos.novoPedido, element: withSuspense(<NovoPedido />) },
+      { path: paths.suprimentos.consultaInsumos, element: withSuspense(<ConsultaInsumos />) },
 
-      // Contratos
-      { path: paths.contratos.analiseNovo, ...lazyPage(() => import("../pages/Contratos/AnaliseNovo")) },
-      { path: paths.contratos.analiseAditivo, ...lazyPage(() => import("../pages/Contratos/AnaliseAditivo")) },
-      { path: paths.contratos.distrato, ...lazyPage(() => import("../pages/Contratos/Distrato")) },
-      { path: paths.contratos.consulta, ...lazyPage(() => import("../pages/Contratos/Consulta")) },
-      { path: paths.contratos.equalizacao, ...lazyPage(() => import("../pages/Contratos/Equalizacao")) },
+      { path: paths.contratos.analiseNovo, element: withSuspense(<AnaliseNovo />) },
+      { path: paths.contratos.analiseAditivo, element: withSuspense(<AnaliseAditivo />) },
+      { path: paths.contratos.distrato, element: withSuspense(<Distrato />) },
+      { path: paths.contratos.consulta, element: withSuspense(<Consulta />) },
+      { path: paths.contratos.equalizacao, element: withSuspense(<Equalizacao />) },
 
-      // Histórico
-      { path: paths.historico, ...lazyPage(() => import("../pages/Historico")) },
-    ],
-  },
+      { path: paths.historico, element: withSuspense(<Historico />) }
+    ]
+  }
 ]);
 
 export default router;
