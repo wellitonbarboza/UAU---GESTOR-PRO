@@ -86,6 +86,15 @@ export const sheetColumns: Record<SheetKey, Record<string, string>> = {
     AD: 'valor_total_contrato'
   },
   '260-DESEMBOLSO DET. PRODUTO': {
+    C: 'codigo_empresa',
+    D: 'descricao_empresa',
+    F: 'codigo_obra',
+    G: 'centro_custos',
+    H: 'obra_detalhada',
+    N: 'codigo_insumo',
+    O: 'descricao_insumo',
+    Q: 'codigo_planejamento',
+    R: 'descricao_planejamento',
     T: 'data',
     U: 'codigo_fornecedor',
     V: 'nome_fornecedor',
