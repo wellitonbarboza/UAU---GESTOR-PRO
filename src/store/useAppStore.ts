@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Obra } from "../types/domain";
 
-type User = { email: string } | null;
+type User = { email: string; role?: "admin" | "operacional" | "viewer" } | null;
 
 type AppState = {
   companyId: string | null;

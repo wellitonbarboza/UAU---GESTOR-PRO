@@ -14,5 +14,6 @@ export const paths = {
     consulta: "/contratos/consulta",
     equalizacao: "/contratos/equalizacao"
   },
-  historico: "/historico"
+  historico: "/historico",
+  usuarios: "/usuarios"
 };

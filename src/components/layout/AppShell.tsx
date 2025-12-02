@@ -23,13 +23,25 @@ import {
 
 import { paths } from "../../routes/paths";
 import { useAppStore } from "../../store/useAppStore";
+import { ADMIN_EMAIL } from "../../config/auth";
 import { isSupabaseEnabled, supabase } from "../../lib/supabaseClient";
 import StatusPill from "../ui/Status";
 import { PrimaryButton, Select } from "../ui/Controls";
 
 export default function AppShell() {
   const nav = useNavigate();
-  const { obraId, setObraId, periodo, setPeriodo, setUser, obras, setObras, setCompany, companyName } = useAppStore();
+  const {
+    obraId,
+    setObraId,
+    periodo,
+    setPeriodo,
+    setUser,
+    obras,
+    setObras,
+    setCompany,
+    companyName,
+    user
+  } = useAppStore();
   const [loadingObras, setLoadingObras] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const obra = useMemo(() => obras.find((o) => o.id === obraId) ?? null, [obras, obraId]);
@@ -57,7 +69,7 @@ export default function AppShell() {
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("company_id")
+        .select("company_id, role")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -72,6 +84,8 @@ export default function AppShell() {
         setLoadingObras(false);
         return;
       }
+
+      setUser({ email: userData.user.email ?? "", role: profile.role });
 
       const companyLookup = await supabase
         .from("companies")
@@ -123,6 +137,8 @@ export default function AppShell() {
     nav(paths.auth);
   }
 
+  const isAdmin = user?.role === "admin" || user?.email === ADMIN_EMAIL;
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <div className="mx-auto flex max-w-[1400px] gap-4 p-4">
@@ -141,6 +157,7 @@ export default function AppShell() {
             <div className="mt-4 grid gap-2">
               <SideItem to={paths.dashboard} icon={<LayoutDashboard className="h-4 w-4" />} label="Início" />
               <SideItem to={paths.historico} icon={<History className="h-4 w-4" />} label="Histórico" />
+              {isAdmin ? <SideItem to={paths.usuarios} icon={<FileText className="h-4 w-4" />} label="Usuários" /> : null}
             </div>
           </div>
 
