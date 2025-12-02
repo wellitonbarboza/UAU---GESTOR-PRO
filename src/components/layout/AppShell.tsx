@@ -60,12 +60,13 @@ export default function AppShell() {
       setLoadError(null);
 
       const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) {
+      const user = userData.user;
+      if (!user) {
         setLoadError("Sessão não encontrada. Faça login novamente.");
         setLoadingObras(false);
         return;
       }
+      const userId = user.id;
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -85,7 +86,7 @@ export default function AppShell() {
         return;
       }
 
-      setUser({ email: userData.user.email ?? "", role: profile.role });
+      setUser({ email: user.email ?? "", role: profile.role });
 
       const companyLookup = await supabase
         .from("companies")
