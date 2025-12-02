@@ -1,17 +1,17 @@
 import React, { useState } from "react";
-import { CheckCircle2, FileUp, Filter } from "lucide-react";
-import type { Obra } from "../types/domain";
-import { Card } from "../components/ui/Card";
-import { PrimaryButton } from "../components/ui/Buttons";
-import { StatusPill } from "../components/ui/StatusPill";
-import { DatabaseIcon } from "../components/icons/DatabaseIcon";
+import Card from "../ui/Card";
+import StatusPill from "../ui/Status";
+import { PrimaryButton } from "../ui/Controls";
+import { FileUp, CheckCircle2, Filter } from "lucide-react";
 
-export default function PageDadosUpload({ obra }: { obra: Obra }) {
+export default function DadosUpload() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [stage, setStage] = useState<"idle" | "validado" | "processado" | "persistido">("idle");
   const [log, setLog] = useState<string[]>([]);
 
-  const step = (s: string) => setLog((p) => [...p, s]);
+  function step(s: string) {
+    setLog((p) => [...p, s]);
+  }
 
   return (
     <div className="space-y-4">
@@ -21,9 +21,7 @@ export default function PageDadosUpload({ obra }: { obra: Obra }) {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-semibold">Arquivo</div>
-                <div className="text-xs text-zinc-500">
-                  Obra: {obra.centroCusto} · {obra.sigla}
-                </div>
+                <div className="text-xs text-zinc-500">UAU exportado</div>
               </div>
               <div className="rounded-2xl border border-zinc-200 bg-white p-2">
                 <FileUp className="h-4 w-4" />
@@ -78,7 +76,7 @@ export default function PageDadosUpload({ obra }: { obra: Obra }) {
                 disabled={!fileName}
                 onClick={() => {
                   setStage("validado");
-                  step("Validação OK: 9 abas obrigatórias encontradas.");
+                  step("Validação OK: abas obrigatórias encontradas.");
                 }}
               >
                 <CheckCircle2 className="h-4 w-4" /> Validar
@@ -88,8 +86,8 @@ export default function PageDadosUpload({ obra }: { obra: Obra }) {
                 disabled={!fileName || (stage !== "validado" && stage !== "processado")}
                 onClick={() => {
                   setStage("processado");
-                  step("Processamento OK: RAW=4.328 linhas; Canônico=contratos/processos/itens.");
-                  step("Alertas: 5 processos com incorrido sem contrato.");
+                  step("Processamento OK: RAW e Canônico gerados.");
+                  step("Alertas: processos com incorrido sem contrato detectados.");
                 }}
               >
                 <Filter className="h-4 w-4" /> Processar
@@ -99,10 +97,10 @@ export default function PageDadosUpload({ obra }: { obra: Obra }) {
                 disabled={stage !== "processado"}
                 onClick={() => {
                   setStage("persistido");
-                  step("Persistência OK: batch salvo, histórico liberado.");
+                  step("Persistência OK: batch salvo e histórico liberado.");
                 }}
               >
-                <DatabaseIcon /> Persistir
+                Persistir
               </PrimaryButton>
             </div>
           </div>
