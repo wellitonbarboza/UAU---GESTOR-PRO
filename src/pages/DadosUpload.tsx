@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import Card from "../ui/Card";
-import StatusPill from "../ui/Status";
-import { PrimaryButton } from "../ui/Controls";
+import Card from "../components/ui/Card";
+import StatusPill from "../components/ui/Status";
+import { PrimaryButton } from "../components/ui/Controls";
 import { FileUp, CheckCircle2, Filter } from "lucide-react";
 
 export default function DadosUpload() {

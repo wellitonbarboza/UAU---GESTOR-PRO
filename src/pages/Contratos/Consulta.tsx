@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { Search, FileDown } from "lucide-react";
-import Card from "../../ui/Card";
-import StatusPill from "../../ui/Status";
-import ProgressBar from "../../ui/Progress";
-import { IconButton, Select } from "../../ui/Controls";
+import Card from "../../components/ui/Card";
+import StatusPill from "../../components/ui/Status";
+import ProgressBar from "../../components/ui/Progress";
+import { IconButton, Select } from "../../components/ui/Controls";
 import { brl, pct } from "../../lib/format";
 import { MOCK_CONTRATOS } from "../../mock/data";
 

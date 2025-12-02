@@ -1,5 +1,5 @@
 import React from "react";
-import { cx } from "../lib/format";
+import { cx } from "../../lib/format";
 
 export default function Table({
   columns,
@@ -48,3 +48,5 @@ export default function Table({
     </div>
   );
 }
+
+export { Table };

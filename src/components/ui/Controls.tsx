@@ -1,6 +1,6 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
-import { cx } from "../lib/format";
+import { cx } from "../../lib/format";
 
 export function IconButton({
   onClick,

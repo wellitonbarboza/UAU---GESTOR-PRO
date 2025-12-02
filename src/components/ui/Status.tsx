@@ -1,5 +1,5 @@
 import React from "react";
-import { cx } from "../lib/format";
+import { cx } from "../../lib/format";
 
 export default function StatusPill({ tone, text }: { tone: "ok" | "warn" | "muted" | "danger"; text: string }) {
   const cls =

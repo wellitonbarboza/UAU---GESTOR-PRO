@@ -1,7 +1,7 @@
 import React from "react";
-import Card from "../ui/Card";
-import Table from "../ui/Table";
-import { PrimaryButton, Input } from "../ui/Controls";
+import Card from "../components/ui/Card";
+import Table from "../components/ui/Table";
+import { PrimaryButton, Input } from "../components/ui/Controls";
 import { useAppStore } from "../store/useAppStore";
 import { MOCK_OBRAS } from "../mock/data";
 import { cx } from "../lib/format";

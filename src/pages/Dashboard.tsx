@@ -1,10 +1,10 @@
 import React, { useMemo } from "react";
 import { Receipt, CircleDollarSign, Layers, CheckCircle2, AlertTriangle } from "lucide-react";
-import KPI from "../ui/KPI";
-import Card from "../ui/Card";
-import Table from "../ui/Table";
-import StatusPill from "../ui/Status";
-import ProgressBar from "../ui/Progress";
+import KPI from "../components/ui/KPI";
+import Card from "../components/ui/Card";
+import Table from "../components/ui/Table";
+import StatusPill from "../components/ui/Status";
+import ProgressBar from "../components/ui/Progress";
 import { brl, pct } from "../lib/format";
 import { MOCK_CONTRATOS, MOCK_PROCESSOS_SEM_CONTRATO } from "../mock/data";
 import { useAppStore } from "../store/useAppStore";
