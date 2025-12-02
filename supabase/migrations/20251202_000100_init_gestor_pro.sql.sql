@@ -50,6 +50,7 @@ create table public.login_allowed_users (
   id uuid primary key default extensions.gen_random_uuid(),
   email text not null unique,
   full_name text null,
+  password text null,
   role public.app_role not null default 'viewer',
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -503,12 +504,32 @@ to authenticated
 using (company_id = (select p.company_id from public.profiles p where p.user_id = auth.uid()))
 with check (company_id = (select p.company_id from public.profiles p where p.user_id = auth.uid()));
 
-insert into public.login_allowed_users (email, full_name, role, is_active)
-values ('welliton.barboza@trinusco.com.br', 'Administrador', 'admin', true)
+insert into public.login_allowed_users (email, full_name, password, role, is_active)
+values ('welliton.barboza@trinusco.com.br', 'Administrador', '123456', 'admin', true)
 on conflict (email) do update set
   full_name = excluded.full_name,
+  password = excluded.password,
   role = excluded.role,
   is_active = excluded.is_active;
+
+-- Cria usuário padrão diretamente no Auth com a senha definida
+insert into auth.users (id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values (
+  extensions.gen_random_uuid(),
+  'authenticated',
+  'authenticated',
+  'welliton.barboza@trinusco.com.br',
+  extensions.crypt('123456', extensions.gen_salt('bf')),
+  now(),
+  '{"provider": "email"}',
+  '{}',
+  now(),
+  now()
+)
+on conflict (email) do update set
+  encrypted_password = excluded.encrypted_password,
+  email_confirmed_at = excluded.email_confirmed_at,
+  updated_at = excluded.updated_at;
 
 -- Storage bucket (para XLSX)
 insert into storage.buckets (id, name, public)
