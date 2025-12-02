@@ -7,7 +7,7 @@ import { readWorkbook } from '../lib/uau/importer';
 import { useImportStore } from '../store/useImportStore';
 import { persistBatch } from '../lib/uau/persist';
 import { isSupabaseEnabled } from '../lib/supabaseClient';
-import { CompanyMetadata, extractCompanyMetadata } from '../lib/uau/company';
+import { CompanyMetadata, buildCompanyId, extractCompanyMetadata } from '../lib/uau/company';
 
 function DadosUpload() {
   const {
@@ -26,7 +26,6 @@ function DadosUpload() {
   const [persisting, setPersisting] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
   const [persistMessage, setPersistMessage] = useState<string | null>(null);
-  const [companyIdInput, setCompanyIdInput] = useState('');
 
   const totaisDesembolso = useMemo(() => {
     const desembolsos = canonical?.desembolsos || [];
@@ -63,21 +62,10 @@ function DadosUpload() {
     setCompanyMetadata(metadata);
   }, [importResult]);
 
-  const inferredCompanyId = useMemo(
-    () => companyMetadata?.codigo_empresa || '',
-    [companyMetadata]
-  );
-
   const effectiveCompanyId = useMemo(
-    () => (companyIdInput || inferredCompanyId || '').trim(),
-    [companyIdInput, inferredCompanyId]
+    () => (importResult ? buildCompanyId(companyMetadata) : ''),
+    [companyMetadata, importResult]
   );
-
-  useEffect(() => {
-    if (inferredCompanyId) {
-      setCompanyIdInput((current) => current || inferredCompanyId);
-    }
-  }, [inferredCompanyId]);
 
   const processar = () => {
     if (!importResult) return;
@@ -87,10 +75,6 @@ function DadosUpload() {
 
   const persistirSupabase = async () => {
     if (!importResult) return;
-    if (!effectiveCompanyId) {
-      setPersistError('Informe manualmente o company_id ou envie uma planilha válida.');
-      return;
-    }
 
     const canonicalized = canonical || canonicalize(importResult);
     setCanonical(canonicalized);
@@ -175,10 +159,9 @@ function DadosUpload() {
           <div className="flex gap-2 items-center">
             <input
               type="text"
-              value={companyIdInput}
-              onChange={(e) => setCompanyIdInput(e.target.value)}
-              placeholder={inferredCompanyId ? `Detectado: ${inferredCompanyId}` : 'Informe o company_id'}
-              className="px-2 py-2 text-sm border rounded"
+              value={effectiveCompanyId || 'Aguardando leitura da planilha...'}
+              readOnly
+              className="px-2 py-2 text-sm border rounded bg-slate-50"
             />
             <button
               onClick={persistirSupabase}
@@ -192,6 +175,10 @@ function DadosUpload() {
       >
         <div className="text-sm text-slate-700 space-y-2">
           <div className="text-slate-600">O arquivo completo (todas as abas) será inserido no Supabase.</div>
+          <div className="text-slate-700">
+            Company ID (automático):{' '}
+            <span className="font-mono">{effectiveCompanyId || 'Aguardando leitura da planilha'}</span>
+          </div>
           {companyMetadata && (
             <div className="text-slate-700">
               Empresa detectada: {companyMetadata.codigo_empresa || 'N/A'} -{' '}

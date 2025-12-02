@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { extractCompanyMetadata, generateCompanyId, CompanyMetadata } from './company';
+import { extractCompanyMetadata, generateCompanyId, CompanyMetadata, buildCompanyId } from './company';
 import { ImportResult, RawSheetRow } from './importer';
 import { SheetKey } from './sheetMap';
 
@@ -82,5 +82,21 @@ describe('extractCompanyMetadata', () => {
     expect(metadata.codigo_empresa).toBe('generated-company-id');
     expect(metadata.descricao_empresa).toBe('Empresa sem codigo');
     expect(metadata.codigo_obra).toBe('OB-01');
+  });
+});
+
+describe('buildCompanyId', () => {
+  it('concatenates company and obra codes when available', () => {
+    const companyId = buildCompanyId({ codigo_empresa: '42', codigo_obra: 'OB-01' });
+
+    expect(companyId).toBe('42-OB-01');
+  });
+
+  it('falls back to a generated id when nothing is provided', () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'generated-id' });
+
+    const companyId = buildCompanyId();
+
+    expect(companyId).toBe('generated-id');
   });
 });

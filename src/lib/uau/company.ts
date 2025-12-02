@@ -7,6 +7,25 @@ export interface CompanyMetadata {
   centro_custos?: string;
 }
 
+function normalize(value: unknown) {
+  if (value === undefined || value === null) return undefined;
+  return String(value).trim();
+}
+
+export function buildCompanyId(metadata?: CompanyMetadata | null): string {
+  if (!metadata) return '';
+
+  const parts = [metadata.codigo_empresa, metadata.codigo_obra]
+    .map((value) => normalize(value))
+    .filter(Boolean) as string[];
+
+  if (parts.length > 0) {
+    return parts.join('-');
+  }
+
+  return generateCompanyId();
+}
+
 export function generateCompanyId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -18,11 +37,6 @@ export function generateCompanyId(): string {
     const value = char === 'x' ? rand : (rand & 0x3) | 0x8;
     return value.toString(16);
   });
-}
-
-function normalize(value: unknown) {
-  if (value === undefined || value === null) return undefined;
-  return String(value).trim();
 }
 
 export function extractCompanyMetadata(importResult: ImportResult): CompanyMetadata {
