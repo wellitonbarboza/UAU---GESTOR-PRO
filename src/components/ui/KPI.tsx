@@ -1,10 +1,10 @@
 import React from "react";
 
-export function KPI({
+export default function KPI({
   label,
   value,
   hint,
-  icon,
+  icon
 }: {
   label: string;
   value: string;
