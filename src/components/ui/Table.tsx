@@ -1,9 +1,13 @@
 import React from "react";
-import { cx } from "../../utils/cx";
+import { cx } from "../lib/format";
 
-export type TableColumn = { key: string; header: string; align?: "left" | "right" };
-
-export function Table({ columns, rows }: { columns: TableColumn[]; rows: Array<Record<string, React.ReactNode>> }) {
+export default function Table({
+  columns,
+  rows
+}: {
+  columns: { key: string; header: string; align?: "left" | "right" }[];
+  rows: Record<string, any>[];
+}) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
       <table className="min-w-full text-sm">
@@ -12,7 +16,10 @@ export function Table({ columns, rows }: { columns: TableColumn[]; rows: Array<R
             {columns.map((c) => (
               <th
                 key={c.key}
-                className={cx("px-3 py-2 text-xs font-semibold text-zinc-600", c.align === "right" ? "text-right" : "text-left")}
+                className={cx(
+                  "px-3 py-2 text-xs font-semibold text-zinc-600",
+                  c.align === "right" ? "text-right" : "text-left"
+                )}
               >
                 {c.header}
               </th>
