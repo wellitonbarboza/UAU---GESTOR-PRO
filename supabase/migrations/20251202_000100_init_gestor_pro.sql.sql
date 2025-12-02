@@ -46,6 +46,20 @@ create trigger trg_profiles_updated_at
 before update on public.profiles
 for each row execute function public.set_updated_at();
 
+create table public.login_allowed_users (
+  id uuid primary key default extensions.gen_random_uuid(),
+  email text not null unique,
+  full_name text null,
+  role public.app_role not null default 'viewer',
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create trigger trg_login_allowed_users_updated_at
+before update on public.login_allowed_users
+for each row execute function public.set_updated_at();
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -252,6 +266,7 @@ create index depara_company_idx on public.depara_macros(company_id);
 -- RLS enabled
 alter table public.companies enable row level security;
 alter table public.profiles enable row level security;
+alter table public.login_allowed_users enable row level security;
 alter table public.obras enable row level security;
 alter table public.uau_import_batches enable row level security;
 alter table public.uau_raw_rows enable row level security;
@@ -301,6 +316,38 @@ for update
 to authenticated
 using (user_id = auth.uid())
 with check (user_id = auth.uid());
+
+drop policy if exists login_allowed_select on public.login_allowed_users;
+create policy login_allowed_select on public.login_allowed_users
+for select
+to authenticated
+using (
+  exists (
+    select 1 from auth.users u
+    where u.id = auth.uid() and lower(u.email) = lower(login_allowed_users.email)
+  )
+  or exists (
+    select 1 from public.profiles p
+    where p.user_id = auth.uid() and p.role = 'admin'
+  )
+);
+
+drop policy if exists login_allowed_admin on public.login_allowed_users;
+create policy login_allowed_admin on public.login_allowed_users
+for all
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.user_id = auth.uid() and p.role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.user_id = auth.uid() and p.role = 'admin'
+  )
+);
 
 drop policy if exists obras_select on public.obras;
 create policy obras_select on public.obras
@@ -455,6 +502,13 @@ for all
 to authenticated
 using (company_id = (select p.company_id from public.profiles p where p.user_id = auth.uid()))
 with check (company_id = (select p.company_id from public.profiles p where p.user_id = auth.uid()));
+
+insert into public.login_allowed_users (email, full_name, role, is_active)
+values ('welliton.barboza@trinusco.com.br', 'Administrador', 'admin', true)
+on conflict (email) do update set
+  full_name = excluded.full_name,
+  role = excluded.role,
+  is_active = excluded.is_active;
 
 -- Storage bucket (para XLSX)
 insert into storage.buckets (id, name, public)

@@ -8,6 +8,7 @@ import Dashboard from "../pages/Dashboard";
 import DadosUpload from "../pages/DadosUpload";
 import Obras from "../pages/Obras";
 import Historico from "../pages/Historico";
+import Usuarios from "../pages/Usuarios";
 
 import AnaliseNovo from "../pages/Contratos/AnaliseNovo";
 import AnaliseAditivo from "../pages/Contratos/AnaliseAditivo";
@@ -36,7 +37,8 @@ const router = createBrowserRouter([
       { path: paths.contratos.consulta, element: <Consulta /> },
       { path: paths.contratos.equalizacao, element: <Equalizacao /> },
 
-      { path: paths.historico, element: <Historico /> }
+      { path: paths.historico, element: <Historico /> },
+      { path: paths.usuarios, element: <Usuarios /> }
     ]
   }
 ]);
