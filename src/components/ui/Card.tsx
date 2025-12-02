@@ -1,13 +1,16 @@
 import React from "react";
 
-type Props = {
-  title: React.ReactNode;
-  subtitle?: React.ReactNode;
+export default function Card({
+  title,
+  subtitle,
+  right,
+  children
+}: {
+  title: string;
+  subtitle?: string;
   right?: React.ReactNode;
   children: React.ReactNode;
-};
-
-export function Card({ title, subtitle, right, children }: Props) {
+}) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-start justify-between gap-3 border-b border-zinc-100 p-4">
