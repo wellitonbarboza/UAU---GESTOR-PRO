@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -23,17 +23,96 @@ import {
 
 import { paths } from "../../routes/paths";
 import { useAppStore } from "../../store/useAppStore";
-import { MOCK_OBRAS } from "../../mock/data";
+import { isSupabaseEnabled, supabase } from "../../lib/supabaseClient";
 import StatusPill from "../ui/Status";
 import { PrimaryButton, Select } from "../ui/Controls";
 
 export default function AppShell() {
   const nav = useNavigate();
-  const { obraId, setObraId, periodo, setPeriodo, setUser } = useAppStore();
-  const obra = useMemo(() => MOCK_OBRAS.find((o) => o.id === obraId) ?? MOCK_OBRAS[0], [obraId]);
+  const { obraId, setObraId, periodo, setPeriodo, setUser, obras, setObras, setCompany, companyName } = useAppStore();
+  const [loadingObras, setLoadingObras] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const obra = useMemo(() => obras.find((o) => o.id === obraId) ?? null, [obras, obraId]);
 
   const [openContratos, setOpenContratos] = useState(true);
   const [openSup, setOpenSup] = useState(true);
+
+  useEffect(() => {
+    async function bootstrap() {
+      if (!isSupabaseEnabled || !supabase) {
+        setLoadError("Configure o Supabase para carregar obras reais.");
+        return;
+      }
+
+      setLoadingObras(true);
+      setLoadError(null);
+
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) {
+        setLoadError("Sessão não encontrada. Faça login novamente.");
+        setLoadingObras(false);
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (profileError) {
+        setLoadError(profileError.message);
+        setLoadingObras(false);
+        return;
+      }
+
+      if (!profile?.company_id) {
+        setLoadError("Nenhuma empresa vinculada ao usuário.");
+        setLoadingObras(false);
+        return;
+      }
+
+      const companyLookup = await supabase
+        .from("companies")
+        .select("name")
+        .eq("id", profile.company_id)
+        .maybeSingle();
+
+      setCompany(profile.company_id, companyLookup.data?.name ?? null);
+
+      const { data: obrasData, error } = await supabase
+        .from("obras")
+        .select("id, centro_custo, sigla, nome, status, updated_at, created_at")
+        .eq("company_id", profile.company_id)
+        .order("centro_custo", { ascending: true });
+
+      if (error) {
+        setLoadError(error.message);
+        setLoadingObras(false);
+        return;
+      }
+
+      const mapped = (obrasData ?? []).map((o) => ({
+        id: o.id,
+        centroCusto: o.centro_custo,
+        sigla: o.sigla,
+        nome: o.nome,
+        status: o.status,
+        empresa: companyLookup.data?.name,
+        atualizadoEm: o.updated_at ?? o.created_at ?? new Date().toISOString(),
+      }));
+
+      setObras(mapped);
+      if (!obraId && mapped[0]) {
+        setObraId(mapped[0].id);
+      }
+
+      setLoadingObras(false);
+    }
+
+    bootstrap();
+  }, [setCompany, setObraId, setObras]);
 
   function exportar() {
     alert("Protótipo: exportar relatório/print (no app real: PDF/XLSX)");
@@ -111,7 +190,7 @@ export default function AppShell() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs text-zinc-500">Sessão</div>
-              <StatusPill tone="muted" text="Demo" />
+              <StatusPill tone={isSupabaseEnabled ? "ok" : "muted"} text={isSupabaseEnabled ? "Supabase" : "Offline"} />
             </div>
             <button
               onClick={sair}
@@ -126,18 +205,30 @@ export default function AppShell() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <div className="text-xl font-semibold tracking-tight">{obra.nome}</div>
+                <div className="text-xl font-semibold tracking-tight">{obra?.nome ?? "Selecione ou cadastre uma obra"}</div>
                 <div className="mt-1 text-sm text-zinc-500">
-                  Centro de custo: <span className="font-medium text-zinc-700">{obra.centroCusto}</span> · Sigla: {obra.sigla}
+                  {obra ? (
+                    <>
+                      Centro de custo: <span className="font-medium text-zinc-700">{obra.centroCusto}</span> · Sigla: {obra.sigla}
+                      {obra.status ? <> · Status: {obra.status}</> : null}
+                    </>
+                  ) : (
+                    "Sem obra selecionada"
+                  )}
                 </div>
+                {companyName ? <div className="text-xs text-zinc-500">Empresa: {companyName}</div> : null}
+                {loadError ? (
+                  <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">{loadError}</div>
+                ) : null}
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2">
                   <Select
-                    value={obra.id}
+                    value={obra?.id ?? ""}
                     onChange={setObraId}
-                    options={MOCK_OBRAS.map((o) => ({ value: o.id, label: `${o.centroCusto} · ${o.sigla} · ${o.nome}` }))}
+                    disabled={!obras.length || loadingObras}
+                    options={obras.map((o) => ({ value: o.id, label: `${o.centroCusto} · ${o.sigla} · ${o.nome}` }))}
                   />
                   <div className="relative">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">

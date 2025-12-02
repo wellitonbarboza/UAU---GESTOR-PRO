@@ -1,18 +1,19 @@
 import React from "react";
 import { Calendar, FileDown } from "lucide-react";
 import type { Obra } from "../../types/domain";
-import { MOCK_OBRAS } from "../../data/mock";
 import { PrimaryButton } from "../ui/Buttons";
 import { Select } from "../ui/Select";
 
 export function Topbar({
   obra,
   setObraId,
+  obras,
   periodo,
   setPeriodo,
   onExport,
 }: {
   obra: Obra;
+  obras: Obra[];
   setObraId: (id: string) => void;
   periodo: string;
   setPeriodo: (v: string) => void;
@@ -32,7 +33,7 @@ export function Topbar({
           <Select
             value={obra.id}
             onChange={setObraId}
-            options={MOCK_OBRAS.map((o) => ({ value: o.id, label: `${o.centroCusto} · ${o.sigla} · ${o.nome}` }))}
+            options={obras.map((o) => ({ value: o.id, label: `${o.centroCusto} · ${o.sigla} · ${o.nome}` }))}
           />
           <div className="relative">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">

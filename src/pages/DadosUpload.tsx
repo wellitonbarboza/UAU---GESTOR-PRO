@@ -1,21 +1,157 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { AlertCircle, FileUp, Loader2 } from "lucide-react";
 import Card from "../components/ui/Card";
 import StatusPill from "../components/ui/Status";
 import { PrimaryButton } from "../components/ui/Controls";
-import { FileUp, CheckCircle2, Filter } from "lucide-react";
+import { isSupabaseEnabled, supabase } from "../lib/supabaseClient";
+import { useAppStore } from "../store/useAppStore";
+
+type UploadStage = "idle" | "reading" | "saving" | "done" | "error";
+
+type ParsedRow = { sheet: string; rowIndex: number; data: Record<string, unknown> };
 
 export default function DadosUpload() {
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [stage, setStage] = useState<"idle" | "validado" | "processado" | "persistido">("idle");
+  const { obraId, companyId } = useAppStore();
+  const [file, setFile] = useState<File | null>(null);
+  const [stage, setStage] = useState<UploadStage>("idle");
   const [log, setLog] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<{ sheets: number; rows: number } | null>(null);
+  const [processing, setProcessing] = useState(false);
 
-  function step(s: string) {
-    setLog((p) => [...p, s]);
+  const supabaseClient = useMemo(() => (isSupabaseEnabled ? supabase : null), []);
+
+  function addLog(message: string) {
+    setLog((prev) => [message, ...prev]);
+  }
+
+  async function parseWorkbook(buffer: ArrayBuffer) {
+    const XLSX = (await import(
+      /* @vite-ignore */ "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs"
+    )) as any;
+    const workbook = XLSX.read(buffer, { type: "array" });
+
+    const rows: ParsedRow[] = [];
+    (workbook.SheetNames as string[]).forEach((sheetName: string) => {
+      const sheet = workbook.Sheets[sheetName];
+      const sheetRows = XLSX.utils.sheet_to_json(sheet, { defval: null }) as Record<string, unknown>[];
+      sheetRows.forEach((row: Record<string, unknown>, idx: number) =>
+        rows.push({ sheet: sheetName, rowIndex: idx + 1, data: row })
+      );
+    });
+
+    return { workbook, rows };
+  }
+
+  async function persistRows(batchId: string, rows: ParsedRow[]) {
+    if (!supabaseClient) return;
+    const payload = rows.map((row) => ({
+      batch_id: batchId,
+      sheet_name: row.sheet,
+      row_index: row.rowIndex,
+      data: row.data,
+    }));
+
+    const chunkSize = 400;
+    for (let i = 0; i < payload.length; i += chunkSize) {
+      const chunk = payload.slice(i, i + chunkSize);
+      const { error: chunkError } = await supabaseClient.from("uau_raw_rows").insert(chunk);
+      if (chunkError) throw chunkError;
+    }
+  }
+
+  async function process() {
+    setError(null);
+
+    if (!file) {
+      setError("Selecione um arquivo XLSX exportado do UAU.");
+      return;
+    }
+
+    if (!supabaseClient) {
+      setError("Supabase não configurado. Defina as variáveis de ambiente e refaça o login.");
+      return;
+    }
+
+    if (!companyId) {
+      setError("Usuário sem empresa vinculada. Entre novamente após vincular um perfil.");
+      return;
+    }
+
+    setProcessing(true);
+    setStage("reading");
+    addLog(`Lendo ${file.name}...`);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const { workbook, rows } = await parseWorkbook(buffer);
+
+      setStats({ sheets: workbook.SheetNames.length, rows: rows.length });
+      addLog(`Encontradas ${workbook.SheetNames.length} abas e ${rows.length} linhas.`);
+
+      setStage("saving");
+
+      const { data: batch, error: batchError } = await supabaseClient
+        .from("uau_import_batches")
+        .insert({
+          company_id: companyId,
+          obra_id: obraId || null,
+          original_filename: file.name,
+          status: "processed",
+          stats: { sheets: workbook.SheetNames.length, rows: rows.length },
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (batchError || !batch) {
+        throw batchError ?? new Error("Não foi possível criar o lote de importação.");
+      }
+
+      const storagePath = `${companyId}/${batch.id}/${file.name}`;
+      const { error: storageError } = await supabaseClient.storage
+        .from("uau-imports")
+        .upload(storagePath, file, { upsert: true });
+
+      if (storageError) {
+        throw storageError;
+      }
+
+      await persistRows(batch.id, rows);
+
+      const now = new Date().toISOString();
+      const { error: updateError } = await supabaseClient
+        .from("uau_import_batches")
+        .update({
+          status: "persisted",
+          processed_at: now,
+          persisted_at: now,
+          storage_path: storagePath,
+          logs: [
+            `Arquivo ${file.name} lido com ${rows.length} linhas`,
+            `Abas processadas: ${workbook.SheetNames.join(", ")}`,
+          ],
+        })
+        .eq("id", batch.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setStage("done");
+      addLog(`Lote ${batch.id} salvo no banco e no bucket uau-imports.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro inesperado ao processar a planilha.";
+      setError(msg);
+      setStage("error");
+      addLog(msg);
+    }
+
+    setProcessing(false);
   }
 
   return (
     <div className="space-y-4">
-      <Card title="Upload do XLSX (UAU)" subtitle="Enviar o arquivo exportado com todas as abas necessárias">
+      <Card title="Upload do XLSX (UAU)" subtitle="Ler o arquivo e salvar os dados base para análises por obra">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
             <div className="flex items-center justify-between">
@@ -35,17 +171,23 @@ export default function DadosUpload() {
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
-                  setFileName(f.name);
+                  setFile(f);
                   setStage("idle");
+                  setStats(null);
                   setLog([`Selecionado: ${f.name}`]);
                 }}
               />
             </div>
 
             <div className="mt-3 text-xs text-zinc-600">
-              {fileName ? (
+              {file ? (
                 <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-3">
-                  <span className="font-medium">{fileName}</span>
+                  <div>
+                    <div className="font-medium">{file.name}</div>
+                    {stats ? (
+                      <div className="text-xs text-zinc-500">{stats.sheets} abas · {stats.rows} linhas</div>
+                    ) : null}
+                  </div>
                   <StatusPill tone="muted" text="Pronto" />
                 </div>
               ) : (
@@ -57,57 +199,39 @@ export default function DadosUpload() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-4">
             <div className="text-sm font-semibold">Fluxo</div>
             <div className="mt-2 grid gap-2 text-sm">
-              <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                <span>1) Validar abas</span>
-                <StatusPill tone={stage !== "idle" ? "ok" : "muted"} text={stage !== "idle" ? "OK" : "—"} />
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                <span>2) Processar (RAW + Canônico)</span>
-                <StatusPill tone={stage === "processado" || stage === "persistido" ? "ok" : "muted"} text={stage === "processado" || stage === "persistido" ? "OK" : "—"} />
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                <span>3) Persistir no banco</span>
-                <StatusPill tone={stage === "persistido" ? "ok" : "muted"} text={stage === "persistido" ? "OK" : "—"} />
-              </div>
+              {["Seleção", "Leitura", "Persistência"].map((label, idx) => {
+                const active =
+                  (idx === 0 && stage !== "idle") ||
+                  (idx === 1 && (stage === "reading" || stage === "saving" || stage === "done")) ||
+                  (idx === 2 && (stage === "saving" || stage === "done"));
+
+                const isOk = stage === "done" || (idx === 1 && (stage === "reading" || stage === "saving"));
+
+                return (
+                  <div key={label} className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                    <span>{idx + 1}) {label}</span>
+                    <StatusPill tone={isOk ? "ok" : active ? "muted" : "muted"} text={active ? "Em andamento" : "—"} />
+                  </div>
+                );
+              })}
             </div>
 
+            {error ? (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                <AlertCircle className="h-4 w-4" /> {error}
+              </div>
+            ) : null}
+
             <div className="mt-3 flex flex-wrap gap-2">
-              <PrimaryButton
-                disabled={!fileName}
-                onClick={() => {
-                  setStage("validado");
-                  step("Validação OK: abas obrigatórias encontradas.");
-                }}
-              >
-                <CheckCircle2 className="h-4 w-4" /> Validar
-              </PrimaryButton>
-
-              <PrimaryButton
-                disabled={!fileName || (stage !== "validado" && stage !== "processado")}
-                onClick={() => {
-                  setStage("processado");
-                  step("Processamento OK: RAW e Canônico gerados.");
-                  step("Alertas: processos com incorrido sem contrato detectados.");
-                }}
-              >
-                <Filter className="h-4 w-4" /> Processar
-              </PrimaryButton>
-
-              <PrimaryButton
-                disabled={stage !== "processado"}
-                onClick={() => {
-                  setStage("persistido");
-                  step("Persistência OK: batch salvo e histórico liberado.");
-                }}
-              >
-                Persistir
+              <PrimaryButton disabled={!file || processing} onClick={process}>
+                {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />} Processar e salvar
               </PrimaryButton>
             </div>
           </div>
         </div>
       </Card>
 
-      <Card title="Log" subtitle="Prévia do que o app registra durante importação">
+      <Card title="Log" subtitle="Eventos registrados durante importação">
         <div className="space-y-2">
           {log.map((l, i) => (
             <div key={i} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm">

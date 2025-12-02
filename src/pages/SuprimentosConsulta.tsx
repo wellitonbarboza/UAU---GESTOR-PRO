@@ -1,24 +1,73 @@
-import React, { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Search } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { FilterBar } from "../components/layout/FilterBar";
 import { Select } from "../components/ui/Select";
 import { Table } from "../components/ui/Table";
 import { brl } from "../utils/format";
-import { MOCK_INSUMOS } from "../data/mock";
+import { useAppStore } from "../store/useAppStore";
+import { isSupabaseEnabled, supabase } from "../lib/supabaseClient";
+import type { Insumo } from "../types/domain";
 
 export default function PageSuprimentosConsulta() {
+  const { obraId, companyId } = useAppStore();
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [q, setQ] = useState("");
   const [tipo, setTipo] = useState("TODOS");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchInsumos() {
+      if (!isSupabaseEnabled || !supabase || !companyId) return;
+      setLoading(true);
+      setError(null);
+
+      const query = supabase
+        .from("insumos")
+        .select(
+          "id, codigo, descricao, categoria, tipo, und, orcado_qtd, orcado_valor, incorrido_qtd, incorrido_valor, updated_at"
+        )
+        .eq("company_id", companyId);
+
+      if (obraId) {
+        query.eq("obra_id", obraId);
+      }
+
+      const { data, error: fetchError } = await query;
+      if (fetchError) {
+        setError(fetchError.message);
+        setLoading(false);
+        return;
+      }
+
+      const mapped: Insumo[] = (data ?? []).map((i) => ({
+        codigo: i.codigo,
+        descricao: i.descricao,
+        categoria: i.categoria ?? "",
+        tipo: i.tipo ?? "MAT",
+        und: i.und ?? "",
+        orcadoQtd: Number(i.orcado_qtd ?? 0),
+        orcadoValor: Number(i.orcado_valor ?? 0),
+        incorridoQtd: Number(i.incorrido_qtd ?? 0),
+        incorridoValor: Number(i.incorrido_valor ?? 0),
+      }));
+
+      setInsumos(mapped);
+      setLoading(false);
+    }
+
+    fetchInsumos();
+  }, [companyId, obraId]);
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return MOCK_INSUMOS.filter((i) => {
+    return insumos.filter((i) => {
       const okText = !t || `${i.codigo} ${i.descricao} ${i.categoria}`.toLowerCase().includes(t);
       const okTipo = tipo === "TODOS" || i.tipo === tipo;
       return okText && okTipo;
     });
-  }, [q, tipo]);
+  }, [insumos, q, tipo]);
 
   return (
     <div className="space-y-4">
@@ -52,25 +101,38 @@ export default function PageSuprimentosConsulta() {
         right={<div />}
       />
 
-      <Card title="Insumos" subtitle="Orçado x Incorrido (mock)">
-        <Table
-          columns={[
-            { key: "codigo", header: "Código" },
-            { key: "descricao", header: "Descrição" },
-            { key: "categoria", header: "Categoria" },
-            { key: "tipo", header: "Tipo" },
-            { key: "orcado", header: "Orçado", align: "right" },
-            { key: "incorrido", header: "Incorrido", align: "right" },
-          ]}
-          rows={rows.map((i) => ({
-            codigo: i.codigo,
-            descricao: i.descricao,
-            categoria: i.categoria,
-            tipo: i.tipo,
-            orcado: brl(i.orcadoValor),
-            incorrido: brl(i.incorridoValor),
-          }))}
-        />
+      <Card title="Insumos" subtitle="Orçado x incorrido da planilha importada">
+        {error ? (
+          <div className="mb-3 inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            <AlertCircle className="h-4 w-4" /> {error}
+          </div>
+        ) : null}
+
+        {!isSupabaseEnabled ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Configure o Supabase para consultar os insumos importados.
+          </div>
+        ) : (
+          <Table
+            columns={[
+              { key: "codigo", header: "Código" },
+              { key: "descricao", header: "Descrição" },
+              { key: "categoria", header: "Categoria" },
+              { key: "tipo", header: "Tipo" },
+              { key: "orcado", header: "Orçado", align: "right" },
+              { key: "incorrido", header: "Incorrido", align: "right" },
+            ]}
+            rows={rows.map((i) => ({
+              codigo: i.codigo,
+              descricao: i.descricao,
+              categoria: i.categoria,
+              tipo: i.tipo,
+              orcado: brl(i.orcadoValor),
+              incorrido: brl(i.incorridoValor),
+            }))}
+            emptyMessage={loading ? "Carregando dados..." : "Nenhum insumo encontrado para esta obra."}
+          />
+        )}
       </Card>
     </div>
   );

@@ -4,11 +4,11 @@ import { Card } from "../components/ui/Card";
 import { PrimaryButton } from "../components/ui/Buttons";
 
 export default function PageSuprimentosNovo() {
-  const [itens, setItens] = useState<Array<{ desc: string; qtd: string }>>([{ desc: "Cimento CP II 50kg", qtd: "100" }]);
+  const [itens, setItens] = useState<Array<{ desc: string; qtd: string }>>([{ desc: "", qtd: "" }]);
 
   return (
     <div className="space-y-4">
-      <Card title="Compras — Novo pedido" subtitle="Protótipo: montar lista e registrar (mock)">
+      <Card title="Compras — Novo pedido" subtitle="Liste os itens que deseja solicitar para a obra selecionada">
         <div className="space-y-3">
           {itens.map((it, idx) => (
             <div key={idx} className="grid gap-2 md:grid-cols-6">
@@ -41,7 +41,7 @@ export default function PageSuprimentosNovo() {
             </PrimaryButton>
 
             <PrimaryButton
-              onClick={() => alert("Protótipo: pedido registrado")}
+              onClick={() => alert("Registro de pedidos será integrado ao backend de suprimentos.")}
             >
               <ShoppingCart className="h-4 w-4" /> Registrar pedido
             </PrimaryButton>
