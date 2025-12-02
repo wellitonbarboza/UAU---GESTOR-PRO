@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
-import Card from "../../ui/Card";
-import Table from "../../ui/Table";
-import { PrimaryButton, Input } from "../../ui/Controls";
+import Card from "../../components/ui/Card";
+import Table from "../../components/ui/Table";
+import { PrimaryButton, Input } from "../../components/ui/Controls";
 import { brl } from "../../lib/format";
 import { MOCK_INSUMOS } from "../../mock/data";
 

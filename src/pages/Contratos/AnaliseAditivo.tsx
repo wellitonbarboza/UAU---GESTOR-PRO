@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
-import Card from "../../ui/Card";
-import Table from "../../ui/Table";
-import StatusPill from "../../ui/Status";
-import { PrimaryButton, Select, Input } from "../../ui/Controls";
+import Card from "../../components/ui/Card";
+import Table from "../../components/ui/Table";
+import StatusPill from "../../components/ui/Status";
+import { PrimaryButton, Select, Input } from "../../components/ui/Controls";
 import { brl } from "../../lib/format";
 import { MOCK_CONTRATOS } from "../../mock/data";
 

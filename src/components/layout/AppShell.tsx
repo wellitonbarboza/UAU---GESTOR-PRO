@@ -21,9 +21,9 @@ import {
   FileDown
 } from "lucide-react";
 
-import { paths } from "../routes/paths";
-import { useAppStore } from "../store/useAppStore";
-import { MOCK_OBRAS } from "../mock/data";
+import { paths } from "../../routes/paths";
+import { useAppStore } from "../../store/useAppStore";
+import { MOCK_OBRAS } from "../../mock/data";
 import StatusPill from "../ui/Status";
 import { PrimaryButton, Select } from "../ui/Controls";
 

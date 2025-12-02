@@ -1,6 +1,6 @@
 import React from "react";
 import { createBrowserRouter } from "react-router-dom";
-import AppShell from "../layout/AppShell";
+import AppShell from "../components/layout/AppShell";
 import { paths } from "./paths";
 
 import Auth from "../pages/Auth";

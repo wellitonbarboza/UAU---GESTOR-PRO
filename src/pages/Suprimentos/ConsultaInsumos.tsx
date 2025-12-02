@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { Search, FileDown } from "lucide-react";
-import Card from "../../ui/Card";
-import Table from "../../ui/Table";
-import { IconButton, Select } from "../../ui/Controls";
+import Card from "../../components/ui/Card";
+import Table from "../../components/ui/Table";
+import { IconButton, Select } from "../../components/ui/Controls";
 import { brl } from "../../lib/format";
 import { MOCK_INSUMOS } from "../../mock/data";
 

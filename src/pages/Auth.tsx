@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Card from "../ui/Card";
-import { Input, PrimaryButton } from "../ui/Controls";
+import Card from "../components/ui/Card";
+import { Input, PrimaryButton } from "../components/ui/Controls";
 import { paths } from "../routes/paths";
 import { supabase, isSupabaseEnabled } from "../lib/supabaseClient";
 import { useAppStore } from "../store/useAppStore";

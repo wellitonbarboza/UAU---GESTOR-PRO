@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
-import Card from "../ui/Card";
-import Table from "../ui/Table";
-import { Select } from "../ui/Controls";
+import Card from "../components/ui/Card";
+import Table from "../components/ui/Table";
+import { Select } from "../components/ui/Controls";
 import { brl } from "../lib/format";
 import { MOCK_HISTORICO } from "../mock/data";
 import { useAppStore } from "../store/useAppStore";

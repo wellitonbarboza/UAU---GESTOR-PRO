@@ -1,5 +1,5 @@
 import React from "react";
-import { clamp } from "../lib/format";
+import { clamp } from "../../lib/format";
 
 export default function ProgressBar({ value }: { value: number }) {
   const v = clamp(value, 0, 1);
