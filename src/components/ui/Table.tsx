@@ -3,10 +3,12 @@ import { cx } from "../../lib/format";
 
 export default function Table({
   columns,
-  rows
+  rows,
+  emptyMessage
 }: {
   columns: { key: string; header: string; align?: "left" | "right" }[];
   rows: Record<string, any>[];
+  emptyMessage?: string;
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
@@ -39,7 +41,7 @@ export default function Table({
           {rows.length === 0 ? (
             <tr className="border-t border-zinc-100">
               <td className="px-3 py-6 text-center text-sm text-zinc-500" colSpan={columns.length}>
-                Nenhum dado.
+                {emptyMessage ?? "Nenhum dado."}
               </td>
             </tr>
           ) : null}

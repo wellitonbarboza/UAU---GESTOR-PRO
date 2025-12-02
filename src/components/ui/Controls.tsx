@@ -69,16 +69,19 @@ export function Input({
 export function Select({
   value,
   onChange,
-  options
+  options,
+  disabled
 }: {
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  disabled?: boolean;
 }) {
   return (
     <div className="relative">
       <select
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className="h-10 w-full appearance-none rounded-2xl border border-zinc-200 bg-white px-3 pr-10 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
       >

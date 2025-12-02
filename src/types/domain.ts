@@ -4,6 +4,7 @@ export type Obra = {
   sigla: string;
   nome: string;
   empresa?: string;
+  status?: "ATIVA" | "PAUSADA" | "CONCLUIDA";
   atualizadoEm: string;
 };
 
