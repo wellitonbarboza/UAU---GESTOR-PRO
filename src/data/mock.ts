@@ -1,0 +1,96 @@
+import type { Contrato, HistoricoItem, Insumo, Obra, ProcessoSemContrato } from "../types/domain";
+
+export const MOCK_OBRAS: Obra[] = [
+  { id: "obr1", centroCusto: "310", sigla: "OBR", nome: "Obra Residencial A", empresa: "Vostro Construtora", atualizadoEm: "2025-12-01" },
+  { id: "obr2", centroCusto: "311", sigla: "OBRWC", nome: "Obra Comercial B", empresa: "Vostro Construtora", atualizadoEm: "2025-11-28" },
+];
+
+export const MOCK_PROCESSOS_SEM_CONTRATO: ProcessoSemContrato[] = [
+  { processo: "102233", parcela: "1", fornecedor: "0042 · ROMILTON", pago: 43890.12, aPagar: 0 },
+  { processo: "102241", parcela: "2", fornecedor: "0019 · FORNECEDOR X", pago: 0, aPagar: 12540.5 },
+  { processo: "102251", parcela: "1", fornecedor: "0042 · ROMILTON", pago: 8820.0, aPagar: 2200.0 },
+  { processo: "102263", parcela: "1", fornecedor: "0077 · CONCRETEIRA", pago: 14890.3, aPagar: 0 },
+  { processo: "102279", parcela: "3", fornecedor: "0031 · LOCADORA", pago: 0, aPagar: 4890.0 },
+];
+
+export const MOCK_CONTRATOS: Contrato[] = [
+  {
+    numero: "CT-2024-031",
+    objeto: "Revestimento interno (mão de obra)",
+    fornecedorCodigo: "0042",
+    fornecedorNome: "ROMILTON",
+    status: "VIGENTE",
+    situacao: "ATIVO",
+    valorTotal: 185000,
+    valorMedido: 124000,
+    valorPago: 98000,
+    valorAPagar: 26000,
+    servicoCodigo: "1.02.15",
+    servicoDescricao: "REVESTIMENTOS",
+  },
+  {
+    numero: "CT-2024-012",
+    objeto: "Estrutura (concreto e armação)",
+    fornecedorCodigo: "0077",
+    fornecedorNome: "CONCRETEIRA",
+    status: "FINALIZADO",
+    situacao: "ENCERRADO",
+    valorTotal: 320000,
+    valorMedido: 320000,
+    valorPago: 320000,
+    valorAPagar: 0,
+    servicoCodigo: "1.01.01",
+    servicoDescricao: "ESTRUTURA",
+  },
+  {
+    numero: "CT-2024-044",
+    objeto: "Locação de equipamentos (mês)",
+    fornecedorCodigo: "0031",
+    fornecedorNome: "LOCADORA",
+    status: "VIGENTE",
+    situacao: "ATIVO",
+    valorTotal: 58000,
+    valorMedido: 21000,
+    valorPago: 17000,
+    valorAPagar: 4000,
+    servicoCodigo: "9.99.01",
+    servicoDescricao: "ADMIN/GERAL",
+  },
+];
+
+export const MOCK_INSUMOS: Insumo[] = [
+  { codigo: "MAT-001", descricao: "Cimento CP II 50kg", categoria: "CIMENTO", tipo: "MAT", und: "sc", orcadoQtd: 2200, orcadoValor: 206800, incorridoQtd: 1870, incorridoValor: 196100 },
+  { codigo: "MAT-014", descricao: "Gesso cola (20kg)", categoria: "GESSO", tipo: "MAT", und: "sc", orcadoQtd: 650, orcadoValor: 55120, incorridoQtd: 520, incorridoValor: 53680 },
+  { codigo: "MO-211", descricao: "Mão de obra: assentamento revestimento", categoria: "REVESTIMENTOS", tipo: "MO", und: "m²", orcadoQtd: 12500, orcadoValor: 188000, incorridoQtd: 8200, incorridoValor: 150000 },
+  { codigo: "COMP-09.12", descricao: "Composição: contrapiso 3cm", categoria: "PISOS", tipo: "COMPOSIÇÃO", und: "m²", orcadoQtd: 4900, orcadoValor: 147000, incorridoQtd: 5100, incorridoValor: 162800 },
+];
+
+export const MOCK_HISTORICO: HistoricoItem[] = [
+  {
+    id: "h1",
+    obraId: "obr1",
+    tipo: "CONTRATO_NOVO",
+    titulo: "Novo contrato — Revestimentos (Romilton)",
+    criadoEm: "2025-11-29 18:22",
+    resumo: "Comparação com contratos vigentes/finalizados, incorrido e orçamento. Conclusão: desvio dentro do limite e ganho de prazo.",
+    impacto: { incorridoAtual: 680000, incorridoNovo: 745000, desvio: -18400 },
+  },
+  {
+    id: "h2",
+    obraId: "obr1",
+    tipo: "COMPRAS",
+    titulo: "Novo pedido — Cimento + Gesso",
+    criadoEm: "2025-11-30 09:10",
+    resumo: "Simulação de compra e confronto com DE-PARA/CAT. Conclusão: excedente de 3,2% em Cimento e economia em Gesso.",
+    impacto: { incorridoAtual: 680000, incorridoNovo: 704200, desvio: -6200 },
+  },
+  {
+    id: "h3",
+    obraId: "obr2",
+    tipo: "DISTRATO",
+    titulo: "Distrato — Locação de equipamentos (Locadora)",
+    criadoEm: "2025-11-26 15:40",
+    resumo: "Checklist de documentação OK. Saldo a medir baixo, recomendação de encerramento com termo e baixa de pendências.",
+    impacto: { incorridoAtual: 410000, incorridoNovo: 410000, desvio: 0 },
+  },
+];
