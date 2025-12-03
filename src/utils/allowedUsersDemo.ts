@@ -4,6 +4,7 @@ type DemoUser = {
   id: string;
   email: string;
   full_name?: string | null;
+  company_id?: string | null;
   role: "admin" | "operacional" | "viewer";
   is_active: boolean;
 };
@@ -18,6 +19,7 @@ function ensureAdminSeed(users: DemoUser[]): DemoUser[] {
       id: crypto.randomUUID(),
       email: ADMIN_EMAIL,
       full_name: "Administrador",
+      company_id: null,
       role: "admin",
       is_active: true
     },

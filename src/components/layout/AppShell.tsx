@@ -80,7 +80,22 @@ export default function AppShell() {
         return;
       }
 
-      if (!profile?.company_id) {
+      let companyId = profile?.company_id ?? null;
+
+      if (!companyId) {
+        const allowedLookup = await supabase
+          .from("login_allowed_users")
+          .select("company_id")
+          .eq("email", user.email ?? "")
+          .maybeSingle();
+
+        if (allowedLookup.data?.company_id) {
+          companyId = allowedLookup.data.company_id;
+          await supabase.from("profiles").update({ company_id: companyId }).eq("user_id", userId);
+        }
+      }
+
+      if (!companyId) {
         setLoadError("Nenhuma empresa vinculada ao usuário.");
         setLoadingObras(false);
         return;
@@ -91,15 +106,15 @@ export default function AppShell() {
       const companyLookup = await supabase
         .from("companies")
         .select("name")
-        .eq("id", profile.company_id)
+        .eq("id", companyId)
         .maybeSingle();
 
-      setCompany(profile.company_id, companyLookup.data?.name ?? null);
+      setCompany(companyId, companyLookup.data?.name ?? null);
 
       const { data: obrasData, error } = await supabase
         .from("obras")
         .select("id, centro_custo, sigla, nome, status, updated_at, created_at")
-        .eq("company_id", profile.company_id)
+        .eq("company_id", companyId)
         .order("centro_custo", { ascending: true });
 
       if (error) {

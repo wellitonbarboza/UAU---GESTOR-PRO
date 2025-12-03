@@ -51,6 +51,7 @@ create table public.login_allowed_users (
   email text not null unique,
   full_name text null,
   password text null,
+  company_id uuid null references public.companies(id) on delete set null,
   role public.app_role not null default 'viewer',
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
