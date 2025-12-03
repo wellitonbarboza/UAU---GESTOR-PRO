@@ -7,12 +7,14 @@ import { cx } from "../lib/format";
 import { AlertCircle, ArrowRight } from "lucide-react";
 import { isSupabaseEnabled, supabase } from "../lib/supabaseClient";
 import type { Obra } from "../types/domain";
+import { ADMIN_EMAIL } from "../config/auth";
 
 export default function Obras() {
-  const { obraId, setObraId, companyId, companyName, obras, setObras } = useAppStore();
+  const { obraId, setObraId, companyId, companyName, obras, setObras, user } = useAppStore();
   const [form, setForm] = useState({ centroCusto: "", sigla: "", nome: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isAdmin = user?.role === "admin" || user?.email === ADMIN_EMAIL;
 
   useEffect(() => {
     async function loadObras() {
@@ -106,9 +108,24 @@ export default function Obras() {
     setSaving(false);
   }
 
+  if (!isAdmin) {
+    return (
+      <div className="p-4">
+        <Card title="Acesso restrito" subtitle="Somente administradores podem cadastrar ou vincular obras aos usuários.">
+          <p className="text-sm text-zinc-600">
+            Todas as obras cadastradas ficam sob responsabilidade do perfil administrador padrão ({ADMIN_EMAIL}).
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <Card title="Obras cadastradas" subtitle="Cada obra pode ter um arquivo (upload) com as abas exportadas do UAU">
+      <Card
+        title="Obras cadastradas"
+        subtitle="Obras registradas pelo administrador (vinculadas ao perfil administrador) podem receber upload das abas do UAU"
+      >
         <Table
           columns={[
             { key: "cc", header: "Centro de custo" },
@@ -139,7 +156,10 @@ export default function Obras() {
         />
       </Card>
 
-      <Card title="Cadastro" subtitle="Cadastre manualmente uma obra e vincule o upload da planilha">
+      <Card
+        title="Cadastro"
+        subtitle="Cadastre manualmente uma obra em nome do administrador e vincule o upload da planilha"
+      >
         <div className="space-y-3">
           {error ? (
             <div className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">

@@ -198,7 +198,7 @@ export default function AppShell() {
             {openSup ? (
               <div className="mt-2 grid gap-1">
                 <SideItem to={paths.suprimentos.dados} icon={<FileUp className="h-4 w-4" />} label="Dados (Upload)" />
-                <SideItem to={paths.suprimentos.obras} icon={<Building2 className="h-4 w-4" />} label="Obras" />
+                {isAdmin ? <SideItem to={paths.suprimentos.obras} icon={<Building2 className="h-4 w-4" />} label="Obras" /> : null}
                 <SideItem to={paths.suprimentos.novoPedido} icon={<ClipboardList className="h-4 w-4" />} label="Compras — Novo Pedido" />
                 <SideItem to={paths.suprimentos.consultaInsumos} icon={<FileSearch className="h-4 w-4" />} label="Consulta — Insumos" />
               </div>
