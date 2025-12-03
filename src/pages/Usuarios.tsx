@@ -10,6 +10,7 @@ import {
   loadDemoAllowedUsers,
   upsertDemoAllowedUser
 } from "../utils/allowedUsersDemo";
+import { DemoCompany, loadDemoCompanies, upsertDemoCompany } from "../utils/demoCompanies";
 
 const roleOptions = [
   { value: "admin", label: "Administrador" },
@@ -21,6 +22,8 @@ type AllowedUser = {
   id: string;
   email: string;
   full_name?: string | null;
+  company_id?: string | null;
+  company?: { name: string | null };
   role: "admin" | "operacional" | "viewer";
   is_active: boolean;
 };
@@ -30,9 +33,12 @@ export default function Usuarios() {
   const [users, setUsers] = useState<AllowedUser[]>([]);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [role, setRole] = useState("viewer");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<DemoCompany[]>([]);
+  const [newCompanyName, setNewCompanyName] = useState("");
 
   const isAdmin = useMemo(() => user?.role === "admin" || user?.email === ADMIN_EMAIL, [user]);
 
@@ -45,7 +51,7 @@ export default function Usuarios() {
 
     const { data, error: queryError } = await supabase
       .from("login_allowed_users")
-      .select("id, email, full_name, role, is_active")
+      .select("id, email, full_name, role, is_active, company_id, companies(name)")
       .order("email", { ascending: true });
 
     if (queryError) {
@@ -58,6 +64,27 @@ export default function Usuarios() {
 
   useEffect(() => {
     fetchUsers();
+
+    if (!isSupabaseEnabled || !supabase) {
+      setCompanies(loadDemoCompanies());
+      return;
+    }
+
+    async function loadCompanies() {
+      const { data, error: companyError } = await supabase
+        .from("companies")
+        .select("id, name")
+        .order("name", { ascending: true });
+
+      if (companyError) {
+        setError(companyError.message);
+        return;
+      }
+
+      setCompanies((data as DemoCompany[]) ?? []);
+    }
+
+    loadCompanies();
   }, []);
 
   async function handleCreate() {
@@ -70,10 +97,17 @@ export default function Usuarios() {
     setSaving(true);
 
     if (!isSupabaseEnabled || !supabase) {
-      const updated = upsertDemoAllowedUser({ email: normalized, full_name: fullName, role: role as AllowedUser["role"], is_active: true });
+      const updated = upsertDemoAllowedUser({
+        email: normalized,
+        full_name: fullName,
+        company_id: companyId || null,
+        role: role as AllowedUser["role"],
+        is_active: true
+      });
       setUsers(updated);
       setEmail("");
       setFullName("");
+      setCompanyId("");
       setRole("viewer");
       setSaving(false);
       return;
@@ -82,6 +116,7 @@ export default function Usuarios() {
     const { error: insertError } = await supabase.from("login_allowed_users").upsert({
       email: normalized,
       full_name: fullName || null,
+      company_id: companyId || null,
       role: role as AllowedUser["role"],
       is_active: true
     });
@@ -95,6 +130,7 @@ export default function Usuarios() {
     await fetchUsers();
     setEmail("");
     setFullName("");
+    setCompanyId("");
     setRole("viewer");
     setSaving(false);
   }
@@ -137,6 +173,42 @@ export default function Usuarios() {
     await fetchUsers();
   }
 
+  async function handleCreateCompany() {
+    setError(null);
+    const trimmed = newCompanyName.trim();
+    if (!trimmed) {
+      setError("Informe um nome de empresa válido.");
+      return;
+    }
+
+    if (!isSupabaseEnabled || !supabase) {
+      const updated = upsertDemoCompany({ name: trimmed });
+      setCompanies(updated);
+      setNewCompanyName("");
+      setCompanyId(updated[updated.length - 1]?.id ?? "");
+      return;
+    }
+
+    const userInfo = await supabase.auth.getUser();
+    const createdBy = userInfo.data.user?.id ?? null;
+    const { data, error: insertError } = await supabase
+      .from("companies")
+      .insert({ name: trimmed, created_by: createdBy })
+      .select("id, name")
+      .maybeSingle();
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+
+    if (data) {
+      setCompanies((prev) => [...prev, data as DemoCompany]);
+      setCompanyId(data.id);
+    }
+    setNewCompanyName("");
+  }
+
   if (!isAdmin) {
     return (
       <div className="p-6">
@@ -156,6 +228,14 @@ export default function Usuarios() {
         <div className="grid gap-3 md:grid-cols-2">
           <Input value={email} onChange={setEmail} placeholder="E-mail" />
           <Input value={fullName} onChange={setFullName} placeholder="Nome completo (opcional)" />
+          <Select
+            value={companyId}
+            onChange={setCompanyId}
+            options={[
+              { value: "", label: "Sem empresa vinculada" },
+              ...companies.map((c) => ({ value: c.id, label: c.name }))
+            ]}
+          />
           <Select value={role} onChange={setRole} options={roleOptions} />
           <div className="flex items-center gap-2">
             <PrimaryButton onClick={handleCreate} disabled={saving}>Cadastrar usuário</PrimaryButton>
@@ -179,6 +259,9 @@ export default function Usuarios() {
                   ) : null}
                 </div>
                 <div className="text-xs text-zinc-500">{u.full_name || "Sem nome informado"}</div>
+                <div className="text-xs text-zinc-500">
+                  Empresa: {u.company?.name || companies.find((c) => c.id === u.company_id)?.name || "Não vinculada"}
+                </div>
                 <div className="inline-flex items-center gap-2 text-xs text-zinc-600">
                   <Shield className="h-3 w-3" /> Permissão: {roleOptions.find((r) => r.value === u.role)?.label}
                 </div>
@@ -212,6 +295,18 @@ export default function Usuarios() {
           {users.length === 0 ? (
             <div className="p-4 text-sm text-zinc-500">Nenhum usuário cadastrado ainda.</div>
           ) : null}
+        </div>
+      </Card>
+
+      <Card title="Empresas" subtitle="Cadastre empresas para vincular aos usuários autorizados.">
+        <div className="grid gap-3 md:grid-cols-[2fr,1fr]">
+          <Input value={newCompanyName} onChange={setNewCompanyName} placeholder="Nome da empresa" />
+          <PrimaryButton onClick={handleCreateCompany}>Cadastrar empresa</PrimaryButton>
+        </div>
+        <div className="mt-3 text-xs text-zinc-500">
+          {companies.length === 0
+            ? "Nenhuma empresa cadastrada ainda."
+            : `Empresas disponíveis: ${companies.map((c) => c.name).join(", ")}`}
         </div>
       </Card>
 
