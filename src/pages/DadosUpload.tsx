@@ -121,21 +121,20 @@ export default function DadosUpload() {
     }
   }
 
-  async function upsertWorkbookTables(rows: ParsedRow[]) {
-    if (!supabaseClient || !companyId) return;
+  async function importSheetRows(batchId: string, rows: ParsedRow[]) {
+    if (!supabaseClient) return;
 
     const payload = rows.map((row) => ({ sheet: row.sheet, data: row.data }));
     const chunkSize = 150;
 
     for (let i = 0; i < payload.length; i += chunkSize) {
       const chunk = payload.slice(i, i + chunkSize);
-      const { error: upsertError } = await supabaseClient.rpc("dynamic_import_workbook", {
-        p_company_id: companyId,
-        p_obra_id: obraId || null,
+      const { error: importError } = await supabaseClient.rpc("import_uau_sheets", {
+        p_batch_id: batchId,
         p_rows: chunk,
       });
 
-      if (upsertError) throw upsertError;
+      if (importError) throw importError;
     }
   }
 
@@ -197,33 +196,9 @@ export default function DadosUpload() {
 
       await persistRows(batch.id, rows);
 
-      addLog("Criando ou atualizando tabelas para cada aba...");
-      await upsertWorkbookTables(rows);
-      addLog("Tabelas dinâmicas atualizadas sem duplicar registros.");
-
-      addLog("Sincronizando fornecedores (CodFornProc/Nome_Pes)...");
-      const { error: fornecedoresError } = await supabaseClient.rpc(
-        "sync_fornecedores_from_raw",
-        { p_batch_id: batch.id }
-      );
-
-      if (fornecedoresError) {
-        throw fornecedoresError;
-      }
-
-      addLog("Fornecedores atualizados com sucesso.");
-
-      addLog("Sincronizando insumos (CodInsProcItem/DescrItens)...");
-      const { error: insumosError } = await supabaseClient.rpc(
-        "sync_insumos_catalog_from_raw",
-        { p_batch_id: batch.id }
-      );
-
-      if (insumosError) {
-        throw insumosError;
-      }
-
-      addLog("Insumos atualizados com sucesso.");
+      addLog("Salvando dados nas tabelas específicas de cada aba...");
+      await importSheetRows(batch.id, rows);
+      addLog("Abas importadas para o Supabase.");
 
       const now = new Date().toISOString();
       const { error: updateError } = await supabaseClient
@@ -236,7 +211,7 @@ export default function DadosUpload() {
           logs: [
             `Arquivo ${file.name} lido com ${rows.length} linhas`,
             `Abas processadas: ${workbook.SheetNames.join(", ")}`,
-            "Tabelas dinâmicas geradas a partir das abas",
+            "Abas importadas para as tabelas fixas do Supabase",
           ],
         })
         .eq("id", batch.id);
