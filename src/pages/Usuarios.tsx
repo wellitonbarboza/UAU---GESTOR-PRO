@@ -43,13 +43,14 @@ export default function Usuarios() {
   const isAdmin = useMemo(() => user?.role === "admin" || user?.email === ADMIN_EMAIL, [user]);
 
   async function fetchUsers() {
-    if (!isSupabaseEnabled || !supabase) {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
       const demo = loadDemoAllowedUsers();
       setUsers(demo);
       return;
     }
 
-    const { data, error: queryError } = await supabase
+    const { data, error: queryError } = await client
       .from("login_allowed_users")
       .select("id, email, full_name, role, is_active, company_id, companies(name)")
       .order("email", { ascending: true });
@@ -65,13 +66,16 @@ export default function Usuarios() {
   useEffect(() => {
     fetchUsers();
 
-    if (!isSupabaseEnabled || !supabase) {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
       setCompanies(loadDemoCompanies());
       return;
     }
 
+    const typedClient = client;
+
     async function loadCompanies() {
-      const { data, error: companyError } = await supabase
+      const { data, error: companyError } = await typedClient
         .from("companies")
         .select("id, name")
         .order("name", { ascending: true });
@@ -96,7 +100,8 @@ export default function Usuarios() {
     }
     setSaving(true);
 
-    if (!isSupabaseEnabled || !supabase) {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
       const updated = upsertDemoAllowedUser({
         email: normalized,
         full_name: fullName,
@@ -113,7 +118,7 @@ export default function Usuarios() {
       return;
     }
 
-    const { error: insertError } = await supabase.from("login_allowed_users").upsert({
+    const { error: insertError } = await client.from("login_allowed_users").upsert({
       email: normalized,
       full_name: fullName || null,
       company_id: companyId || null,
@@ -136,13 +141,14 @@ export default function Usuarios() {
   }
 
   async function toggleActive(target: AllowedUser) {
-    if (!isSupabaseEnabled || !supabase) {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
       const updated = upsertDemoAllowedUser({ ...target, is_active: !target.is_active });
       setUsers(updated);
       return;
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await client
       .from("login_allowed_users")
       .update({ is_active: !target.is_active })
       .eq("id", target.id);
@@ -159,13 +165,14 @@ export default function Usuarios() {
       return;
     }
 
-    if (!isSupabaseEnabled || !supabase) {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
       const updated = deleteDemoAllowedUser(target.id);
       setUsers(updated as AllowedUser[]);
       return;
     }
 
-    const { error: delError } = await supabase.from("login_allowed_users").delete().eq("id", target.id);
+    const { error: delError } = await client.from("login_allowed_users").delete().eq("id", target.id);
     if (delError) {
       setError(delError.message);
       return;
@@ -181,7 +188,8 @@ export default function Usuarios() {
       return;
     }
 
-    if (!isSupabaseEnabled || !supabase) {
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
       const updated = upsertDemoCompany({ name: trimmed });
       setCompanies(updated);
       setNewCompanyName("");
@@ -189,9 +197,9 @@ export default function Usuarios() {
       return;
     }
 
-    const userInfo = await supabase.auth.getUser();
+    const userInfo = await client.auth.getUser();
     const createdBy = userInfo.data.user?.id ?? null;
-    const { data, error: insertError } = await supabase
+    const { data, error: insertError } = await client
       .from("companies")
       .insert({ name: trimmed, created_by: createdBy })
       .select("id, name")
