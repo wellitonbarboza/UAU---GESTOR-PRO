@@ -15,12 +15,12 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
-  async function checkAllowedSupabase(targetEmail: string) {
+  async function checkAllowedSupabase(targetEmail: string, providedPassword: string) {
     if (!supabase) return { allowed: false, role: undefined } as const;
     const normalized = targetEmail.trim().toLowerCase();
     const { data, error } = await supabase
       .from("login_allowed_users")
-      .select("id, is_active, role")
+      .select("id, is_active, role, password")
       .eq("email", normalized)
       .maybeSingle();
 
@@ -34,16 +34,29 @@ export default function Auth() {
       return { allowed: false, role: undefined } as const;
     }
 
+    const trimmedPassword = providedPassword.trim();
+    if (data.password && data.password !== trimmedPassword) {
+      setMsg("Senha incorreta. Tente novamente.");
+      return { allowed: false, role: undefined } as const;
+    }
+
     return { allowed: true, role: data.role } as const;
   }
 
-  function checkAllowedDemo(targetEmail: string) {
+  function checkAllowedDemo(targetEmail: string, providedPassword: string) {
     const normalized = targetEmail.trim().toLowerCase();
     const allowed = loadDemoAllowedUsers().find((u) => u.email === normalized && u.is_active);
     if (!allowed) {
       setMsg("Usuário não autorizado no modo demo. Solicite ao administrador.");
       return { allowed: false, role: undefined } as const;
     }
+
+    const trimmedPassword = providedPassword.trim();
+    if (allowed.password && allowed.password !== trimmedPassword) {
+      setMsg("Senha incorreta. Tente novamente.");
+      return { allowed: false, role: undefined } as const;
+    }
+
     return { allowed: true, role: allowed.role } as const;
   }
 
@@ -57,24 +70,15 @@ export default function Auth() {
     }
 
     if (!isSupabaseEnabled || !supabase) {
-      const { allowed, role } = checkAllowedDemo(normalizedEmail);
+      const { allowed, role } = checkAllowedDemo(normalizedEmail, password);
       if (!allowed) return;
       setUser({ email: normalizedEmail, role });
       nav(paths.dashboard);
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-
-    const { allowed, role } = await checkAllowedSupabase(normalizedEmail);
-    if (!allowed) {
-      await supabase.auth.signOut();
-      return;
-    }
+    const { allowed, role } = await checkAllowedSupabase(normalizedEmail, password);
+    if (!allowed) return;
 
     setUser({ email: normalizedEmail, role });
     nav(paths.dashboard);
@@ -93,7 +97,7 @@ export default function Auth() {
         >
           <div className="space-y-3">
             <Input value={email} onChange={setEmail} placeholder="E-mail" />
-            <Input value={password} onChange={setPassword} placeholder="Senha" />
+            <Input value={password} onChange={setPassword} placeholder="Senha" type="password" />
             {msg ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{msg}</div>
             ) : null}

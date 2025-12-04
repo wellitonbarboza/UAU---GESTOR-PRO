@@ -59,62 +59,55 @@ export default function AppShell() {
       setLoadingObras(true);
       setLoadError(null);
 
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      if (!user) {
+      const providedEmail = user?.email ?? null;
+      const sessionEmail = providedEmail
+        ? providedEmail
+        : (await supabase.auth.getUser()).data.user?.email ?? null;
+
+      if (!sessionEmail) {
         setLoadError("Sessão não encontrada. Faça login novamente.");
         setLoadingObras(false);
         return;
       }
-      const userId = user.id;
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("company_id, role")
-        .eq("user_id", userId)
+      const { data: allowed, error: allowedError } = await supabase
+        .from("login_allowed_users")
+        .select("email, role, company_id, is_active")
+        .eq("email", sessionEmail)
         .maybeSingle();
 
-      if (profileError) {
-        setLoadError(profileError.message);
+      if (allowedError) {
+        setLoadError(allowedError.message);
         setLoadingObras(false);
         return;
       }
 
-      let companyId = profile?.company_id ?? null;
-
-      if (!companyId) {
-        const allowedLookup = await supabase
-          .from("login_allowed_users")
-          .select("company_id")
-          .eq("email", user.email ?? "")
-          .maybeSingle();
-
-        if (allowedLookup.data?.company_id) {
-          companyId = allowedLookup.data.company_id;
-          await supabase.from("profiles").update({ company_id: companyId }).eq("user_id", userId);
-        }
+      if (!allowed || !allowed.is_active) {
+        setLoadError("Usuário sem permissão de acesso. Contate o administrador.");
+        setLoadingObras(false);
+        return;
       }
 
-      if (!companyId) {
+      if (!allowed.company_id) {
         setLoadError("Nenhuma empresa vinculada ao usuário.");
         setLoadingObras(false);
         return;
       }
 
-      setUser({ email: user.email ?? "", role: profile?.role });
+      setUser({ email: allowed.email, role: allowed.role });
 
       const companyLookup = await supabase
         .from("companies")
         .select("name")
-        .eq("id", companyId)
+        .eq("id", allowed.company_id)
         .maybeSingle();
 
-      setCompany(companyId, companyLookup.data?.name ?? null);
+      setCompany(allowed.company_id, companyLookup.data?.name ?? null);
 
       const { data: obrasData, error } = await supabase
         .from("obras")
         .select("id, centro_custo, sigla, nome, status, updated_at, created_at")
-        .eq("company_id", companyId)
+        .eq("company_id", allowed.company_id)
         .order("centro_custo", { ascending: true });
 
       if (error) {
