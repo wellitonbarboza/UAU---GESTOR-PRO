@@ -57,7 +57,7 @@ export default function Usuarios() {
 
     const { data, error: queryError } = await client
       .from("login_allowed_users")
-      .select("id, email, full_name, role, is_active, company_id, password, companies(name)")
+      .select("id, email, full_name, role, is_active, company_id, password")
       .order("email", { ascending: true });
 
     if (queryError) {
@@ -156,12 +156,12 @@ export default function Usuarios() {
           .from("login_allowed_users")
           .update(payload)
           .eq("id", editingUserId)
-          .select("id, email, full_name, role, is_active, company_id, password, companies(name)")
+          .select("id, email, full_name, role, is_active, company_id, password")
           .maybeSingle()
       : client
           .from("login_allowed_users")
           .upsert(payload)
-          .select("id, email, full_name, role, is_active, company_id, password, companies(name)")
+          .select("id, email, full_name, role, is_active, company_id, password")
           .maybeSingle());
 
     if (insertError) {
