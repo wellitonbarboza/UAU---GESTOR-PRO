@@ -151,11 +151,18 @@ export default function Usuarios() {
       ...(trimmedPassword ? { password: trimmedPassword } : editingUserId ? {} : { password: null })
     };
 
-    const query = editingUserId
-      ? client.from("login_allowed_users").update(payload).eq("id", editingUserId)
-      : client.from("login_allowed_users").upsert(payload);
-
-    const { error: insertError } = await query;
+    const { data: upserted, error: insertError } = await (editingUserId
+      ? client
+          .from("login_allowed_users")
+          .update(payload)
+          .eq("id", editingUserId)
+          .select("id, email, full_name, role, is_active, company_id, password, companies(name)")
+          .maybeSingle()
+      : client
+          .from("login_allowed_users")
+          .upsert(payload)
+          .select("id, email, full_name, role, is_active, company_id, password, companies(name)")
+          .maybeSingle());
 
     if (insertError) {
       setError(insertError.message);
@@ -163,7 +170,14 @@ export default function Usuarios() {
       return;
     }
 
-    await fetchUsers();
+    if (upserted) {
+      setUsers((prev) => {
+        const withoutTarget = prev.filter((u) => u.id !== upserted.id);
+        return [...withoutTarget, upserted as AllowedUser].sort((a, b) => a.email.localeCompare(b.email));
+      });
+    } else {
+      await fetchUsers();
+    }
     resetUserForm();
     setSaving(false);
   }
