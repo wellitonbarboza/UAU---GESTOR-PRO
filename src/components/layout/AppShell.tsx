@@ -101,7 +101,7 @@ export default function AppShell() {
         return;
       }
 
-      setUser({ email: user.email ?? "", role: profile.role });
+      setUser({ email: user.email ?? "", role: profile?.role });
 
       const companyLookup = await supabase
         .from("companies")
