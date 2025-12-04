@@ -191,6 +191,18 @@ export default function DadosUpload() {
 
       addLog("Fornecedores atualizados com sucesso.");
 
+      addLog("Sincronizando insumos (CodInsProcItem/DescrItens)...");
+      const { error: insumosError } = await supabaseClient.rpc(
+        "sync_insumos_catalog_from_raw",
+        { p_batch_id: batch.id }
+      );
+
+      if (insumosError) {
+        throw insumosError;
+      }
+
+      addLog("Insumos atualizados com sucesso.");
+
       const now = new Date().toISOString();
       const { error: updateError } = await supabaseClient
         .from("uau_import_batches")

@@ -1,6 +1,10 @@
 export const paths = {
   auth: "/auth",
   dashboard: "/",
+  cadastros: {
+    fornecedores: "/cadastros/fornecedores",
+    insumos: "/cadastros/insumos"
+  },
   suprimentos: {
     dados: "/suprimentos/dados",
     obras: "/suprimentos/obras",
