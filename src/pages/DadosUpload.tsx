@@ -179,6 +179,18 @@ export default function DadosUpload() {
 
       await persistRows(batch.id, rows);
 
+      addLog("Sincronizando fornecedores (CodFornProc/Nome_Pes)...");
+      const { error: fornecedoresError } = await supabaseClient.rpc(
+        "sync_fornecedores_from_raw",
+        { p_batch_id: batch.id }
+      );
+
+      if (fornecedoresError) {
+        throw fornecedoresError;
+      }
+
+      addLog("Fornecedores atualizados com sucesso.");
+
       const now = new Date().toISOString();
       const { error: updateError } = await supabaseClient
         .from("uau_import_batches")
