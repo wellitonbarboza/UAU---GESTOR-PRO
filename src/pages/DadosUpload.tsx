@@ -121,6 +121,24 @@ export default function DadosUpload() {
     }
   }
 
+  async function upsertWorkbookTables(rows: ParsedRow[]) {
+    if (!supabaseClient || !companyId) return;
+
+    const payload = rows.map((row) => ({ sheet: row.sheet, data: row.data }));
+    const chunkSize = 150;
+
+    for (let i = 0; i < payload.length; i += chunkSize) {
+      const chunk = payload.slice(i, i + chunkSize);
+      const { error: upsertError } = await supabaseClient.rpc("dynamic_import_workbook", {
+        p_company_id: companyId,
+        p_obra_id: obraId || null,
+        p_rows: chunk,
+      });
+
+      if (upsertError) throw upsertError;
+    }
+  }
+
   async function process() {
     setError(null);
 
@@ -179,6 +197,10 @@ export default function DadosUpload() {
 
       await persistRows(batch.id, rows);
 
+      addLog("Criando ou atualizando tabelas para cada aba...");
+      await upsertWorkbookTables(rows);
+      addLog("Tabelas dinâmicas atualizadas sem duplicar registros.");
+
       addLog("Sincronizando fornecedores (CodFornProc/Nome_Pes)...");
       const { error: fornecedoresError } = await supabaseClient.rpc(
         "sync_fornecedores_from_raw",
@@ -214,6 +236,7 @@ export default function DadosUpload() {
           logs: [
             `Arquivo ${file.name} lido com ${rows.length} linhas`,
             `Abas processadas: ${workbook.SheetNames.join(", ")}`,
+            "Tabelas dinâmicas geradas a partir das abas",
           ],
         })
         .eq("id", batch.id);
