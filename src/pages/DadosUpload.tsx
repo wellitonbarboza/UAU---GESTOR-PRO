@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AlertCircle, FileUp, Loader2 } from "lucide-react";
 import Card from "../components/ui/Card";
 import StatusPill from "../components/ui/Status";
@@ -10,16 +10,77 @@ type UploadStage = "idle" | "reading" | "saving" | "done" | "error";
 
 type ParsedRow = { sheet: string; rowIndex: number; data: Record<string, unknown> };
 
+type ImportHistory = {
+  id: string;
+  obraId: string | null;
+  filename: string | null;
+  status: string;
+  createdAt: string;
+  rows?: number;
+};
+
 export default function DadosUpload() {
-  const { obraId, companyId } = useAppStore();
+  const { obraId, companyId, obras } = useAppStore();
   const [file, setFile] = useState<File | null>(null);
   const [stage, setStage] = useState<UploadStage>("idle");
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<{ sheets: number; rows: number } | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [history, setHistory] = useState<ImportHistory[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const supabaseClient = useMemo(() => (isSupabaseEnabled ? supabase : null), []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      if (!supabaseClient || !companyId) return;
+
+      setLoadingHistory(true);
+      setHistoryError(null);
+
+      const query = supabaseClient
+        .from("uau_import_batches")
+        .select("id, obra_id, original_filename, status, created_at, stats")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (obraId) {
+        query.eq("obra_id", obraId);
+      }
+
+      const { data, error: fetchError } = await query;
+
+      if (!active) return;
+
+      if (fetchError) {
+        setHistoryError(fetchError.message);
+        setHistory([]);
+      } else {
+        const mapped: ImportHistory[] = (data ?? []).map((item) => ({
+          id: item.id,
+          obraId: item.obra_id,
+          filename: item.original_filename,
+          status: item.status,
+          createdAt: item.created_at,
+          rows: typeof item.stats?.rows === "number" ? item.stats.rows : undefined,
+        }));
+        setHistory(mapped);
+      }
+
+      setLoadingHistory(false);
+    }
+
+    loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, [companyId, obraId, supabaseClient]);
 
   function addLog(message: string) {
     setLog((prev) => [message, ...prev]);
@@ -228,6 +289,42 @@ export default function DadosUpload() {
               </PrimaryButton>
             </div>
           </div>
+        </div>
+      </Card>
+
+      <Card title="Histórico de uploads" subtitle="Últimos arquivos importados por obra">
+        {historyError ? (
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            <AlertCircle className="h-4 w-4" /> {historyError}
+          </div>
+        ) : null}
+
+        <div className="mt-3 space-y-2">
+          {loadingHistory ? (
+            <div className="text-sm text-zinc-500">Carregando histórico...</div>
+          ) : history.length === 0 ? (
+            <div className="text-sm text-zinc-500">Nenhum upload registrado para esta obra ainda.</div>
+          ) : (
+            history.map((item) => {
+              const obraNome = obras.find((o) => o.id === item.obraId)?.nome ?? "Obra não definida";
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-white p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">{item.filename ?? "Arquivo sem nome"}</div>
+                    <div className="text-xs text-zinc-500">
+                      {obraNome} · {new Date(item.createdAt).toLocaleString("pt-BR")} ·
+                      {" "}
+                      {item.rows ? `${item.rows} linhas` : "linhas não registradas"}
+                    </div>
+                  </div>
+                  <StatusPill tone="muted" text={item.status} />
+                </div>
+              );
+            })
+          )}
         </div>
       </Card>
 
