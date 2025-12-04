@@ -47,3 +47,10 @@ export function upsertDemoCompany(payload: Omit<DemoCompany, "id"> & { id?: stri
   saveDemoCompanies(updated);
   return updated;
 }
+
+export function deleteDemoCompany(id: string): DemoCompany[] {
+  const companies = loadDemoCompanies().filter((c) => c.id !== id);
+  const seeded = ensureSeed(companies);
+  saveDemoCompanies(seeded);
+  return seeded;
+}
