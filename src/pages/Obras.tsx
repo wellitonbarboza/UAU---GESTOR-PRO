@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Card from "../components/ui/Card";
 import Table from "../components/ui/Table";
-import { PrimaryButton, Input } from "../components/ui/Controls";
+import { PrimaryButton, Input, Select } from "../components/ui/Controls";
 import { useAppStore } from "../store/useAppStore";
 import { cx } from "../lib/format";
 import { AlertCircle, ArrowRight } from "lucide-react";
@@ -11,11 +11,17 @@ import { ADMIN_EMAIL } from "../config/auth";
 
 export default function Obras() {
   const { obraId, setObraId, companyId, companyName, obras, setObras, user } = useAppStore();
-  const [form, setForm] = useState({ centroCusto: "", sigla: "", nome: "" });
+  const [form, setForm] = useState({ centroCusto: "", sigla: "", nome: "", status: "ATIVA" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingObraId, setEditingObraId] = useState<string | null>(null);
   const isAdmin = user?.role === "admin" || user?.email === ADMIN_EMAIL;
+
+  const statusOptions = [
+    { value: "ATIVA", label: "Ativa" },
+    { value: "PAUSADA", label: "Pausada" },
+    { value: "CONCLUIDA", label: "Concluída" }
+  ];
 
   useEffect(() => {
     async function loadObras() {
@@ -53,7 +59,7 @@ export default function Obras() {
   const rows = useMemo(() => obras, [obras]);
 
   function resetForm() {
-    setForm({ centroCusto: "", sigla: "", nome: "" });
+    setForm({ centroCusto: "", sigla: "", nome: "", status: "ATIVA" });
     setEditingObraId(null);
   }
 
@@ -61,7 +67,8 @@ export default function Obras() {
     setForm({
       centroCusto: obra.centroCusto,
       sigla: obra.sigla,
-      nome: obra.nome
+      nome: obra.nome,
+      status: obra.status ?? "ATIVA"
     });
     setEditingObraId(obra.id);
   }
@@ -91,6 +98,7 @@ export default function Obras() {
       centro_custo: form.centroCusto.trim(),
       sigla: form.sigla.trim(),
       nome: form.nome.trim(),
+      status: form.status as Obra["status"],
     };
 
     const query = editingObraId
@@ -190,6 +198,7 @@ export default function Obras() {
             { key: "cc", header: "Centro de custo" },
             { key: "sigla", header: "Sigla" },
             { key: "nome", header: "Obra" },
+            { key: "status", header: "Status" },
             { key: "empresa", header: "Empresa" },
             { key: "atualizado", header: "Atualizado" },
             { key: "acao", header: "Ação" }
@@ -198,6 +207,7 @@ export default function Obras() {
             cc: o.centroCusto,
             sigla: o.sigla,
             nome: o.nome,
+            status: o.status ?? "-",
             empresa: o.empresa ?? companyName ?? "-",
             atualizado: new Date(o.atualizadoEm).toLocaleDateString("pt-BR"),
             acao: (
@@ -244,6 +254,7 @@ export default function Obras() {
             <Input value={form.centroCusto} onChange={(v) => setForm((p) => ({ ...p, centroCusto: v }))} placeholder="Centro de custo (ex.: 310)" />
             <Input value={form.sigla} onChange={(v) => setForm((p) => ({ ...p, sigla: v }))} placeholder="Sigla (ex.: OBR)" />
             <Input value={form.nome} onChange={(v) => setForm((p) => ({ ...p, nome: v }))} placeholder="Nome da obra" />
+            <Select value={form.status} onChange={(v) => setForm((p) => ({ ...p, status: v }))} options={statusOptions} />
             <PrimaryButton onClick={salvar} disabled={saving}>
               {saving ? "Salvando..." : editingObraId ? "Salvar alterações" : "Salvar"}
             </PrimaryButton>
