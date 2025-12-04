@@ -50,17 +50,20 @@ export function PrimaryButton({
 export function Input({
   value,
   onChange,
-  placeholder
+  placeholder,
+  type = "text"
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  type?: React.HTMLInputTypeAttribute;
 }) {
   return (
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      type={type}
       className="h-10 w-full rounded-2xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
     />
   );
