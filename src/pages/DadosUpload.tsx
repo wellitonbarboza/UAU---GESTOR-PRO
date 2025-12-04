@@ -124,7 +124,12 @@ export default function DadosUpload() {
   async function importSheetRows(batchId: string, rows: ParsedRow[]) {
     if (!supabaseClient) return;
 
-    const payload = rows.map((row) => ({ sheet: row.sheet, data: row.data }));
+    const payload = rows.map((row) => ({
+      sheet: row.sheet,
+      data: Object.fromEntries(
+        Object.entries(row.data).map(([key, value]) => [key, value ?? null])
+      ),
+    }));
     const chunkSize = 150;
 
     for (let i = 0; i < payload.length; i += chunkSize) {
@@ -134,7 +139,11 @@ export default function DadosUpload() {
         p_rows: chunk,
       });
 
-      if (importError) throw importError;
+      if (importError) {
+        throw new Error(
+          `Falha ao importar lote (${chunk.length} linhas) para o Supabase: ${importError.message}`
+        );
+      }
     }
   }
 
