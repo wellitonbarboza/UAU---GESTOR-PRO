@@ -9,6 +9,8 @@ import DadosUpload from "../pages/DadosUpload";
 import Obras from "../pages/Obras";
 import Historico from "../pages/Historico";
 import Usuarios from "../pages/Usuarios";
+import Fornecedores from "../pages/Cadastros/Fornecedores";
+import Insumos from "../pages/Cadastros/Insumos";
 
 import AnaliseNovo from "../pages/Contratos/AnaliseNovo";
 import AnaliseAditivo from "../pages/Contratos/AnaliseAditivo";
@@ -30,6 +32,9 @@ const router = createBrowserRouter([
       { path: paths.suprimentos.obras, element: <Obras /> },
       { path: paths.suprimentos.novoPedido, element: <NovoPedido /> },
       { path: paths.suprimentos.consultaInsumos, element: <ConsultaInsumos /> },
+
+      { path: paths.cadastros.fornecedores, element: <Fornecedores /> },
+      { path: paths.cadastros.insumos, element: <Insumos /> },
 
       { path: paths.contratos.analiseNovo, element: <AnaliseNovo /> },
       { path: paths.contratos.analiseAditivo, element: <AnaliseAditivo /> },

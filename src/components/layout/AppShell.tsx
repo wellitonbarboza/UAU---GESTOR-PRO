@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   FileUp,
   Package,
+  NotebookTabs,
   Building2,
   FileText,
   ClipboardList,
@@ -18,7 +19,9 @@ import {
   ChevronDown,
   ChevronRight,
   ArrowRight,
-  FileDown
+  FileDown,
+  Truck,
+  Box
 } from "lucide-react";
 
 import { paths } from "../../routes/paths";
@@ -48,6 +51,7 @@ export default function AppShell() {
 
   const [openContratos, setOpenContratos] = useState(true);
   const [openSup, setOpenSup] = useState(true);
+  const [openCad, setOpenCad] = useState(true);
 
   useEffect(() => {
     async function bootstrap() {
@@ -188,6 +192,25 @@ export default function AppShell() {
                 <SideItem to={paths.contratos.distrato} icon={<Scale className="h-4 w-4" />} label="Distrato" />
                 <SideItem to={paths.contratos.consulta} icon={<FileSearch className="h-4 w-4" />} label="Consulta" />
                 <SideItem to={paths.contratos.equalizacao} icon={<BadgeCheck className="h-4 w-4" />} label="Equalização" />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <button
+              className="flex w-full items-center justify-between rounded-2xl px-2 py-2 text-sm text-zinc-800 hover:bg-zinc-50"
+              onClick={() => setOpenCad((v) => !v)}
+            >
+              <span className="inline-flex items-center gap-2 font-semibold">
+                <NotebookTabs className="h-4 w-4" /> Cadastros
+              </span>
+              {openCad ? <ChevronDown className="h-4 w-4 text-zinc-400" /> : <ChevronRight className="h-4 w-4 text-zinc-400" />}
+            </button>
+
+            {openCad ? (
+              <div className="mt-2 grid gap-1">
+                <SideItem to={paths.cadastros.fornecedores} icon={<Truck className="h-4 w-4" />} label="Fornecedores" />
+                <SideItem to={paths.cadastros.insumos} icon={<Box className="h-4 w-4" />} label="Insumos" />
               </div>
             ) : null}
           </div>
