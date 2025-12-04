@@ -14,6 +14,7 @@ export default function Obras() {
   const [form, setForm] = useState({ centroCusto: "", sigla: "", nome: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingObraId, setEditingObraId] = useState<string | null>(null);
   const isAdmin = user?.role === "admin" || user?.email === ADMIN_EMAIL;
 
   useEffect(() => {
@@ -51,6 +52,20 @@ export default function Obras() {
 
   const rows = useMemo(() => obras, [obras]);
 
+  function resetForm() {
+    setForm({ centroCusto: "", sigla: "", nome: "" });
+    setEditingObraId(null);
+  }
+
+  function startEdit(obra: Obra) {
+    setForm({
+      centroCusto: obra.centroCusto,
+      sigla: obra.sigla,
+      nome: obra.nome
+    });
+    setEditingObraId(obra.id);
+  }
+
   async function salvar() {
     setError(null);
 
@@ -71,16 +86,27 @@ export default function Obras() {
 
     setSaving(true);
 
-    const { data, error: insertError } = await supabase
-      .from("obras")
-      .insert({
-        company_id: companyId,
-        centro_custo: form.centroCusto.trim(),
-        sigla: form.sigla.trim(),
-        nome: form.nome.trim(),
-      })
-      .select("id, centro_custo, sigla, nome, status, updated_at, created_at")
-      .maybeSingle();
+    const payload = {
+      company_id: companyId,
+      centro_custo: form.centroCusto.trim(),
+      sigla: form.sigla.trim(),
+      nome: form.nome.trim(),
+    };
+
+    const query = editingObraId
+      ? supabase
+          .from("obras")
+          .update(payload)
+          .eq("id", editingObraId)
+          .select("id, centro_custo, sigla, nome, status, updated_at, created_at")
+          .maybeSingle()
+      : supabase
+          .from("obras")
+          .insert(payload)
+          .select("id, centro_custo, sigla, nome, status, updated_at, created_at")
+          .maybeSingle();
+
+    const { data, error: insertError } = await query;
 
     if (insertError) {
       setError(insertError.message);
@@ -99,13 +125,46 @@ export default function Obras() {
         atualizadoEm: data.updated_at ?? data.created_at ?? new Date().toISOString(),
       };
 
-      const atualizadas = [...obras, novaObra].sort((a, b) => a.centroCusto.localeCompare(b.centroCusto));
+      let atualizadas: Obra[];
+
+      if (editingObraId) {
+        atualizadas = obras
+          .map((o) => (o.id === editingObraId ? novaObra : o))
+          .sort((a, b) => a.centroCusto.localeCompare(b.centroCusto));
+      } else {
+        atualizadas = [...obras, novaObra].sort((a, b) => a.centroCusto.localeCompare(b.centroCusto));
+        setObraId(novaObra.id);
+      }
+
       setObras(atualizadas);
-      setObraId(novaObra.id);
-      setForm({ centroCusto: "", sigla: "", nome: "" });
+      resetForm();
     }
 
     setSaving(false);
+  }
+
+  async function deletar(obraParaExcluir: Obra) {
+    setError(null);
+
+    if (!isSupabaseEnabled || !supabase) {
+      setError("Supabase não configurado. Configure as variáveis de ambiente e refaça o login.");
+      return;
+    }
+
+    const { error: deleteError } = await supabase.from("obras").delete().eq("id", obraParaExcluir.id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    const atualizadas = obras.filter((o) => o.id !== obraParaExcluir.id);
+    setObras(atualizadas);
+    if (obraId === obraParaExcluir.id) {
+      setObraId(atualizadas[0]?.id ?? "");
+    }
+    if (editingObraId === obraParaExcluir.id) {
+      resetForm();
+    }
   }
 
   if (!isAdmin) {
@@ -142,22 +201,36 @@ export default function Obras() {
             empresa: o.empresa ?? companyName ?? "-",
             atualizado: new Date(o.atualizadoEm).toLocaleDateString("pt-BR"),
             acao: (
-              <button
-                onClick={() => setObraId(o.id)}
-                className={cx(
-                  "inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-50",
-                  o.id === obraId ? "border-zinc-900" : ""
-                )}
-              >
-                Abrir <ArrowRight className="h-4 w-4" />
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setObraId(o.id)}
+                  className={cx(
+                    "inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-50",
+                    o.id === obraId ? "border-zinc-900" : ""
+                  )}
+                >
+                  Abrir <ArrowRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => startEdit(o)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-white px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => deletar(o)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-3 py-2 text-sm text-rose-700 hover:bg-rose-50"
+                >
+                  Excluir
+                </button>
+              </div>
             )
           }))}
         />
       </Card>
 
       <Card
-        title="Cadastro"
+        title={editingObraId ? "Editar obra" : "Cadastro"}
         subtitle="Cadastre manualmente uma obra em nome do administrador e vincule o upload da planilha"
       >
         <div className="space-y-3">
@@ -172,8 +245,17 @@ export default function Obras() {
             <Input value={form.sigla} onChange={(v) => setForm((p) => ({ ...p, sigla: v }))} placeholder="Sigla (ex.: OBR)" />
             <Input value={form.nome} onChange={(v) => setForm((p) => ({ ...p, nome: v }))} placeholder="Nome da obra" />
             <PrimaryButton onClick={salvar} disabled={saving}>
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando..." : editingObraId ? "Salvar alterações" : "Salvar"}
             </PrimaryButton>
+            {editingObraId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-sm font-semibold text-zinc-700 underline"
+              >
+                Cancelar edição
+              </button>
+            ) : null}
           </div>
         </div>
       </Card>

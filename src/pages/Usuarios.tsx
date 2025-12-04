@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, Mail, Shield, Trash2, XCircle } from "lucide-react";
+import { Check, Edit, Mail, Shield, Trash2, XCircle } from "lucide-react";
 import Card from "../components/ui/Card";
 import { Input, PrimaryButton, Select } from "../components/ui/Controls";
 import { isSupabaseEnabled, supabase } from "../lib/supabaseClient";
@@ -10,7 +10,7 @@ import {
   loadDemoAllowedUsers,
   upsertDemoAllowedUser
 } from "../utils/allowedUsersDemo";
-import { DemoCompany, loadDemoCompanies, upsertDemoCompany } from "../utils/demoCompanies";
+import { DemoCompany, deleteDemoCompany, loadDemoCompanies, upsertDemoCompany } from "../utils/demoCompanies";
 
 const roleOptions = [
   { value: "admin", label: "Administrador" },
@@ -24,6 +24,7 @@ type AllowedUser = {
   full_name?: string | null;
   company_id?: string | null;
   company?: { name: string | null };
+  password?: string | null;
   role: "admin" | "operacional" | "viewer";
   is_active: boolean;
 };
@@ -35,10 +36,14 @@ export default function Usuarios() {
   const [fullName, setFullName] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [role, setRole] = useState("viewer");
+  const [tempPassword, setTempPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [companies, setCompanies] = useState<DemoCompany[]>([]);
   const [newCompanyName, setNewCompanyName] = useState("");
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+  const [editingCompanyName, setEditingCompanyName] = useState("");
 
   const isAdmin = useMemo(() => user?.role === "admin" || user?.email === ADMIN_EMAIL, [user]);
 
@@ -52,7 +57,7 @@ export default function Usuarios() {
 
     const { data, error: queryError } = await client
       .from("login_allowed_users")
-      .select("id, email, full_name, role, is_active, company_id, companies(name)")
+      .select("id, email, full_name, role, is_active, company_id, password, companies(name)")
       .order("email", { ascending: true });
 
     if (queryError) {
@@ -91,40 +96,66 @@ export default function Usuarios() {
     loadCompanies();
   }, []);
 
-  async function handleCreate() {
+  function resetUserForm() {
+    setEmail("");
+    setFullName("");
+    setCompanyId("");
+    setRole("viewer");
+    setTempPassword("");
+    setEditingUserId(null);
+  }
+
+  async function handleSaveUser() {
     setError(null);
     const normalized = email.trim().toLowerCase();
     if (!normalized) {
       setError("Informe um e-mail válido.");
       return;
     }
+
+    const trimmedPassword = tempPassword.trim();
+    if (!editingUserId && !trimmedPassword) {
+      setError("Informe uma senha provisória para concluir o cadastro.");
+      return;
+    }
     setSaving(true);
 
     const client = supabase;
     if (!isSupabaseEnabled || !client) {
-      const updated = upsertDemoAllowedUser({
+      const payload = {
+        id: editingUserId ?? undefined,
         email: normalized,
         full_name: fullName,
         company_id: companyId || null,
         role: role as AllowedUser["role"],
-        is_active: true
-      });
+        is_active: true,
+        ...(trimmedPassword ? { password: trimmedPassword } : {})
+      };
+      const updated = upsertDemoAllowedUser(payload);
       setUsers(updated);
-      setEmail("");
-      setFullName("");
-      setCompanyId("");
-      setRole("viewer");
+      resetUserForm();
       setSaving(false);
       return;
     }
 
-    const { error: insertError } = await client.from("login_allowed_users").upsert({
+    const basePayload = {
       email: normalized,
       full_name: fullName || null,
       company_id: companyId || null,
       role: role as AllowedUser["role"],
       is_active: true
-    });
+    };
+
+    const payload = {
+      ...basePayload,
+      ...(trimmedPassword ? { password: trimmedPassword } : editingUserId ? {} : { password: null })
+    };
+
+    const query = editingUserId
+      ? client.from("login_allowed_users").update(payload).eq("id", editingUserId)
+      : client.from("login_allowed_users").upsert(payload);
+
+    const { error: insertError } = await query;
 
     if (insertError) {
       setError(insertError.message);
@@ -133,10 +164,7 @@ export default function Usuarios() {
     }
 
     await fetchUsers();
-    setEmail("");
-    setFullName("");
-    setCompanyId("");
-    setRole("viewer");
+    resetUserForm();
     setSaving(false);
   }
 
@@ -180,6 +208,15 @@ export default function Usuarios() {
     await fetchUsers();
   }
 
+  function startEditUser(target: AllowedUser) {
+    setEmail(target.email);
+    setFullName(target.full_name ?? "");
+    setCompanyId(target.company_id ?? "");
+    setRole(target.role);
+    setTempPassword(target.password ?? "");
+    setEditingUserId(target.id);
+  }
+
   async function handleCreateCompany() {
     setError(null);
     const trimmed = newCompanyName.trim();
@@ -217,6 +254,64 @@ export default function Usuarios() {
     setNewCompanyName("");
   }
 
+  function startEditCompany(company: DemoCompany) {
+    setEditingCompanyId(company.id);
+    setEditingCompanyName(company.name);
+  }
+
+  async function handleUpdateCompany() {
+    setError(null);
+    if (!editingCompanyId) return;
+    const trimmed = editingCompanyName.trim();
+    if (!trimmed) {
+      setError("Informe um nome de empresa válido.");
+      return;
+    }
+
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
+      const updated = upsertDemoCompany({ id: editingCompanyId, name: trimmed });
+      setCompanies(updated);
+      setEditingCompanyId(null);
+      setEditingCompanyName("");
+      return;
+    }
+
+    const { error: updateError } = await client.from("companies").update({ name: trimmed }).eq("id", editingCompanyId);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setCompanies((prev) => prev.map((c) => (c.id === editingCompanyId ? { ...c, name: trimmed } : c)));
+    setEditingCompanyId(null);
+    setEditingCompanyName("");
+  }
+
+  async function handleDeleteCompany(targetId: string) {
+    setError(null);
+    const client = supabase;
+    if (!isSupabaseEnabled || !client) {
+      const updated = deleteDemoCompany(targetId);
+      setCompanies(updated);
+      if (companyId === targetId) {
+        setCompanyId("");
+      }
+      return;
+    }
+
+    const { error: deleteError } = await client.from("companies").delete().eq("id", targetId);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setCompanies((prev) => prev.filter((c) => c.id !== targetId));
+    if (companyId === targetId) {
+      setCompanyId("");
+    }
+  }
+
   if (!isAdmin) {
     return (
       <div className="p-6">
@@ -230,7 +325,7 @@ export default function Usuarios() {
   return (
     <div className="space-y-4 p-4">
       <Card
-        title="Usuários autorizados"
+        title={editingUserId ? "Editar usuário autorizado" : "Usuários autorizados"}
         subtitle="O administrador controla quem pode acessar, criar perfis e gerenciar obras vinculadas."
       >
         <div className="grid gap-3 md:grid-cols-2">
@@ -245,8 +340,24 @@ export default function Usuarios() {
             ]}
           />
           <Select value={role} onChange={setRole} options={roleOptions} />
+          <Input
+            value={tempPassword}
+            onChange={setTempPassword}
+            placeholder={editingUserId ? "Senha provisória (preencha para alterar)" : "Senha provisória"}
+          />
           <div className="flex items-center gap-2">
-            <PrimaryButton onClick={handleCreate} disabled={saving}>Cadastrar usuário</PrimaryButton>
+            <PrimaryButton onClick={handleSaveUser} disabled={saving}>
+              {editingUserId ? "Salvar alterações" : "Cadastrar usuário"}
+            </PrimaryButton>
+            {editingUserId ? (
+              <button
+                type="button"
+                onClick={resetUserForm}
+                className="text-xs font-semibold text-zinc-600 underline"
+              >
+                Cancelar edição
+              </button>
+            ) : null}
             <p className="text-xs text-zinc-500">O acesso fica liberado imediatamente após salvar.</p>
           </div>
         </div>
@@ -276,6 +387,13 @@ export default function Usuarios() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => startEditUser(u)}
+                  className="inline-flex items-center gap-1 rounded-2xl border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50"
+                >
+                  <Edit className="h-4 w-4" /> Editar
+                </button>
                 <button
                   type="button"
                   onClick={() => toggleActive(u)}
@@ -316,6 +434,52 @@ export default function Usuarios() {
             ? "Nenhuma empresa cadastrada ainda."
             : `Empresas disponíveis: ${companies.map((c) => c.name).join(", ")}`}
         </div>
+        <div className="mt-4 divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white">
+          {companies.map((company) => (
+            <div key={company.id} className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm font-semibold text-zinc-800">{company.name}</div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => startEditCompany(company)}
+                  className="inline-flex items-center gap-1 rounded-2xl border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50"
+                >
+                  <Edit className="h-4 w-4" /> Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCompany(company.id)}
+                  className="inline-flex items-center gap-1 rounded-2xl border border-rose-200 bg-white px-3 py-2 text-rose-700 hover:bg-rose-50"
+                >
+                  <Trash2 className="h-4 w-4" /> Excluir
+                </button>
+              </div>
+            </div>
+          ))}
+          {companies.length === 0 ? (
+            <div className="p-4 text-sm text-zinc-500">Nenhuma empresa cadastrada ainda.</div>
+          ) : null}
+        </div>
+
+        {editingCompanyId ? (
+          <div className="mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+            <div className="text-sm font-semibold text-amber-800">Editar empresa</div>
+            <Input value={editingCompanyName} onChange={setEditingCompanyName} placeholder="Novo nome" />
+            <div className="flex items-center gap-2 text-xs">
+              <PrimaryButton onClick={handleUpdateCompany}>Salvar alterações</PrimaryButton>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingCompanyId(null);
+                  setEditingCompanyName("");
+                }}
+                className="font-semibold text-amber-800 underline"
+              >
+                Cancelar edição
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       <Card

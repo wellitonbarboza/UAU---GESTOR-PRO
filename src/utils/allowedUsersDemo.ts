@@ -5,6 +5,7 @@ type DemoUser = {
   email: string;
   full_name?: string | null;
   company_id?: string | null;
+  password?: string | null;
   role: "admin" | "operacional" | "viewer";
   is_active: boolean;
 };
@@ -20,6 +21,7 @@ function ensureAdminSeed(users: DemoUser[]): DemoUser[] {
       email: ADMIN_EMAIL,
       full_name: "Administrador",
       company_id: null,
+      password: null,
       role: "admin",
       is_active: true
     },
@@ -48,7 +50,14 @@ export function saveDemoAllowedUsers(users: DemoUser[]) {
 export function upsertDemoAllowedUser(payload: Omit<DemoUser, "id"> & { id?: string }): DemoUser[] {
   const users = loadDemoAllowedUsers();
   if (payload.id) {
-    const updated = users.map((u) => (u.id === payload.id ? { ...u, ...payload } : u));
+    const updated = users.map((u) => {
+      if (u.id !== payload.id) return u;
+      const merged = { ...u, ...payload } as DemoUser;
+      if (payload.password === undefined) {
+        merged.password = u.password;
+      }
+      return merged;
+    });
     saveDemoAllowedUsers(updated);
     return updated;
   }
