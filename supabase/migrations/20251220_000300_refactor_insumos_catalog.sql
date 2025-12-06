@@ -58,7 +58,7 @@ begin
     nullif(trim(r.data->>'Desc_CGer'), '') as desc_cat
   from public.uau_raw_rows r
   join public.uau_import_batches b on b.id = r.batch_id
-  where r.sheet_name = '334-Itens Insumos Processos'
+  where r.sheet_name = '334-ITENS INSUMOS PROCESSOS'
     and nullif(trim(r.data->>'CodInsProcItem'), '') is not null
     and nullif(trim(r.data->>'DescrItens'), '') is not null
     and (p_batch_id is null or r.batch_id = p_batch_id)
