@@ -49,9 +49,9 @@ export default function Insumos() {
       setLoading(true);
       setError(null);
 
-      const { data, error: supaError } = await supabase
-        .from<SupabaseInsumoRow>('"334-ITENS INSUMOS PROCESSOS"')
-        .select("CodInsProcItem, DescrItens, UnidProcItem, CategItens, Desc_CGer")
+        const { data, error: supaError } = await supabase
+          .from('"334-ITENS INSUMOS PROCESSOS"')
+          .select("CodInsProcItem, DescrItens, UnidProcItem, CategItens, Desc_CGer")
         .eq("company_id", companyId)
         .eq("obra_id", obraId)
         .order("CodInsProcItem", { ascending: true });
@@ -62,8 +62,10 @@ export default function Insumos() {
         return;
       }
 
+      const rows = (data ?? []) as SupabaseInsumoRow[];
+
       setInsumos(
-        (data ?? []).map((item) => ({
+        rows.map((item) => ({
           id: `${item.CodInsProcItem}-${obraId}`,
           codigo: item.CodInsProcItem,
           descricao: item.DescrItens,
