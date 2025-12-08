@@ -16,6 +16,14 @@ type InsumoRow = {
 };
 
 type SupabaseInsumoRow = {
+  codigo: string;
+  descricao: string;
+  un: string | null;
+  cod_cat: string | null;
+  desc_cat: string | null;
+};
+
+type LegacySheetInsumoRow = {
   CodInsProcItem: string;
   DescrItens: string;
   UnidProcItem: string | null;
@@ -42,45 +50,72 @@ export default function Insumos() {
         return;
       }
 
-      if (!obraId) {
-        setError("Selecione uma obra para listar os insumos desta importação.");
-        return;
-      }
-
       setLoading(true);
       setError(null);
 
       const client = supabase!;
 
       try {
-        const rows = await fetchAllSupabasePages<SupabaseInsumoRow>((from, to) =>
+        const catalogRows = await fetchAllSupabasePages<SupabaseInsumoRow>((from, to) =>
           client
-            .from("334-ITENS INSUMOS PROCESSOS")
-            .select('"CodInsProcItem", "DescrItens", "UnidProcItem", "CategItens", "Desc_CGer", uau_import_batches!inner(company_id)')
-            .eq("uau_import_batches.company_id", companyId)
-            .eq("obra_id", obraId)
-            .order("CodInsProcItem", { ascending: true })
+            .from("insumos")
+            .select("codigo, descricao, un, cod_cat, desc_cat")
+            .eq("company_id", companyId)
+            .order("codigo", { ascending: true })
             .range(from, to)
         );
 
         const unique = new Map<string, SupabaseInsumoRow>();
 
-        rows.forEach((item) => {
-          const codigo = item.CodInsProcItem?.trim();
+        catalogRows.forEach((item) => {
+          const codigo = item.codigo?.trim();
           if (!codigo || unique.has(codigo)) return;
           unique.set(codigo, item);
         });
 
-        setInsumos(
-          Array.from(unique.values()).map((item) => ({
+        let mapped: InsumoRow[] = Array.from(unique.values()).map((item) => ({
+          id: `${item.codigo}-${companyId}`,
+          codigo: item.codigo,
+          descricao: item.descricao,
+          un: item.un,
+          cod_cat: item.cod_cat,
+          desc_cat: item.desc_cat
+        }));
+
+        if (mapped.length === 0 && obraId) {
+          const legacyRows = await fetchAllSupabasePages<LegacySheetInsumoRow>((from, to) =>
+            client
+              .from("334-ITENS INSUMOS PROCESSOS")
+              .select('"CodInsProcItem", "DescrItens", "UnidProcItem", "CategItens", "Desc_CGer", uau_import_batches!inner(company_id)')
+              .eq("uau_import_batches.company_id", companyId)
+              .eq("obra_id", obraId)
+              .order("CodInsProcItem", { ascending: true })
+              .range(from, to)
+          );
+
+          const legacyUnique = new Map<string, LegacySheetInsumoRow>();
+
+          legacyRows.forEach((item) => {
+            const codigo = item.CodInsProcItem?.trim();
+            if (!codigo || legacyUnique.has(codigo)) return;
+            legacyUnique.set(codigo, item);
+          });
+
+          mapped = Array.from(legacyUnique.values()).map((item) => ({
             id: `${item.CodInsProcItem}-${obraId}`,
             codigo: item.CodInsProcItem,
             descricao: item.DescrItens,
             un: item.UnidProcItem,
             cod_cat: item.CategItens,
             desc_cat: item.Desc_CGer
-          }))
-        );
+          }));
+
+          if (mapped.length === 0) {
+            setError("Nenhum insumo encontrado no catálogo ou na importação desta obra.");
+          }
+        }
+
+        setInsumos(mapped);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Falha ao carregar insumos.";
         setError(msg);
