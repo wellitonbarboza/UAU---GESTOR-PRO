@@ -29,7 +29,7 @@ type EqualizacaoSalva = {
   servico: string;
   criadoEm: string;
   fornecedorSelecionado: { id: string; nome: string; total: number };
-  propostas: { id: string; nome: string; total: number; itens: number }[];
+  propostas: { id: string; nome: string; total: number; itens: number; items: ProposalItem[] }[];
 };
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
@@ -60,6 +60,9 @@ export default function AnaliseNovo() {
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState<string | null>(null);
   const [selecaoConfirmada, setSelecaoConfirmada] = useState(false);
   const [equalizacoes, setEqualizacoes] = useState<EqualizacaoSalva[]>([]);
+  const [visualizacaoCompacta, setVisualizacaoCompacta] = useState(false);
+  const [ultimaEqualizacaoId, setUltimaEqualizacaoId] = useState<string | null>(null);
+  const [equalizacaoEditandoId, setEqualizacaoEditandoId] = useState<string | null>(null);
 
   const existentes = useMemo(() => {
     return MOCK_CONTRATOS.filter((c) => (c.servicoDescricao || "").toUpperCase().includes(servicoBusca.toUpperCase()));
@@ -124,8 +127,16 @@ export default function AnaliseNovo() {
       const fornecedorAtual = resumoFornecedores.find((p) => p.id === fornecedorSelecionado);
 
       if (fornecedorAtual) {
+        const propostasSnapshot = propostas.map((p, idx) => ({
+          id: p.id,
+          nome: p.fornecedor?.trim() || `Fornecedor ${idx + 1}`,
+          total: propostaTotais[idx] ?? 0,
+          itens: p.items.length,
+          items: p.items.map((item) => ({ ...item }))
+        }));
+
         const novaEqualizacao: EqualizacaoSalva = {
-          id: uid(),
+          id: equalizacaoEditandoId ?? uid(),
           servico: servicoBusca?.trim() || "Serviço sem título",
           criadoEm: new Date().toISOString(),
           fornecedorSelecionado: {
@@ -133,16 +144,22 @@ export default function AnaliseNovo() {
             nome: rotuloFornecedor(resumoFornecedores, fornecedorAtual.id),
             total: fornecedorAtual.total
           },
-          propostas: resumoFornecedores.map((p, idx) => ({
-            id: p.id,
-            nome: p.fornecedor?.trim() || `Fornecedor ${idx + 1}`,
-            total: p.total,
-            itens: p.items.length
-          }))
+          propostas: propostasSnapshot
         };
 
-        setEqualizacoes((prev) => [novaEqualizacao, ...prev]);
+        setEqualizacoes((prev) => {
+          if (equalizacaoEditandoId) {
+            return prev.map((eq) => (eq.id === equalizacaoEditandoId ? novaEqualizacao : eq));
+          }
+          return [novaEqualizacao, ...prev];
+        });
+
+        setUltimaEqualizacaoId(novaEqualizacao.id);
+        setVisualizacaoCompacta(true);
+        setEqualizacaoEditandoId(null);
       }
+    } else {
+      setVisualizacaoCompacta(false);
     }
 
     setAnaliseSalva(true);
@@ -154,10 +171,44 @@ export default function AnaliseNovo() {
     setAnaliseSalva(false);
     setResumoVisivel(false);
     setSelecaoConfirmada(false);
+    setVisualizacaoCompacta(false);
+    setEqualizacaoEditandoId(null);
   };
 
   const handleSalvarSelecao = () => {
     setSelecaoConfirmada(true);
+  };
+
+  const handleEditarEqualizacao = (eq: EqualizacaoSalva) => {
+    setServicoBusca(eq.servico);
+    setPropostas(
+      eq.propostas.map((p) => ({
+        id: p.id,
+        fornecedor: p.nome,
+        items: p.items.map((item) => ({ ...item }))
+      }))
+    );
+    setAnaliseSalva(true);
+    setResumoVisivel(true);
+    setFornecedorSelecionado(eq.fornecedorSelecionado.id);
+    setSelecaoConfirmada(true);
+    setVisualizacaoCompacta(false);
+    setEqualizacaoEditandoId(eq.id);
+    setUltimaEqualizacaoId(eq.id);
+  };
+
+  const handleExcluirEqualizacao = (id: string) => {
+    setEqualizacoes((prev) => prev.filter((eq) => eq.id !== id));
+
+    if (ultimaEqualizacaoId === id) {
+      setUltimaEqualizacaoId(null);
+      setVisualizacaoCompacta(false);
+      setAnaliseSalva(false);
+      setResumoVisivel(false);
+      setSelecaoConfirmada(false);
+      setFornecedorSelecionado(null);
+      setEqualizacaoEditandoId(null);
+    }
   };
 
   return (
@@ -202,108 +253,174 @@ export default function AnaliseNovo() {
                   catálogo de insumos.
                 </div>
               </div>
-              <PrimaryButton onClick={() => adicionarFornecedor(setPropostas)}>
-                Adicionar fornecedor
-              </PrimaryButton>
+              {!visualizacaoCompacta ? (
+                <PrimaryButton onClick={() => adicionarFornecedor(setPropostas)}>
+                  Adicionar fornecedor
+                </PrimaryButton>
+              ) : null}
             </div>
 
-            <div className="space-y-4">
-              {propostas.map((proposta, idx) => (
-                <div key={proposta.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                    <div className="flex-1">
-                      <label className="text-sm font-semibold text-zinc-900">Fornecedor</label>
-                      <Input
-                        value={proposta.fornecedor}
-                        onChange={(v) => atualizarFornecedor(setPropostas, proposta.id, v)}
-                        placeholder="Nome do fornecedor da proposta"
-                      />
-                    </div>
-                    <div className="text-sm font-semibold text-zinc-800">
-                      Total da proposta: {brl(propostaTotais[idx] ?? 0)}
+            {visualizacaoCompacta ? (
+              <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-amber-900">Equalização salva</div>
+                    <div className="text-xs text-amber-800">
+                      Resumo das propostas preenchidas. Edite para reabrir fornecedores e insumos.
                     </div>
                   </div>
-
-                  <div className="mt-3 space-y-3">
-                    {proposta.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-3 md:grid-cols-6 md:items-end"
+                  <div className="flex gap-2">
+                    {ultimaEqualizacaoId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const eq = equalizacoes.find((item) => item.id === ultimaEqualizacaoId);
+                          if (eq) handleEditarEqualizacao(eq);
+                        }}
+                        className="h-9 rounded-2xl border border-amber-300 px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100"
                       >
-                        <div className="md:col-span-2">
-                          <label className="text-xs font-semibold text-zinc-700">Item/insumo cotado</label>
-                          <input
-                            value={item.insumo}
-                            onChange={(e) => atualizarItem(setPropostas, proposta.id, item.id, { insumo: e.target.value })}
-                            list="insumos-catalogo"
-                            placeholder="Busque pelo nome ou código"
-                            className="mt-1 h-10 w-full rounded-2xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-zinc-700">Unidade de medida</label>
-                          <Input
-                            value={item.unidadeMedida}
-                            onChange={(v) =>
-                              atualizarItem(setPropostas, proposta.id, item.id, { unidadeMedida: v })
-                            }
-                            placeholder="m², un, kg..."
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-zinc-700">Quantidade</label>
-                          <Input
-                            value={item.quantidade}
-                            onChange={(v) => atualizarItem(setPropostas, proposta.id, item.id, { quantidade: v })}
-                            placeholder="0"
-                            type="number"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-zinc-700">Valor unitário</label>
-                          <Input
-                            value={item.valorUnitario}
-                            onChange={(v) => atualizarItem(setPropostas, proposta.id, item.id, { valorUnitario: v })}
-                            placeholder="0,00"
-                            type="number"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-zinc-700">Subtotal</label>
-                          <div className="mt-1 h-10 rounded-2xl border border-zinc-200 bg-zinc-100 px-3 text-sm leading-10 text-zinc-900">
-                            {brl(calcularTotalItem(item.quantidade, item.valorUnitario))}
+                        Editar equalização
+                      </button>
+                    ) : null}
+                    {ultimaEqualizacaoId ? (
+                      <button
+                        type="button"
+                        onClick={() => handleExcluirEqualizacao(ultimaEqualizacaoId)}
+                        className="h-9 rounded-2xl border border-red-200 px-3 text-xs font-semibold text-red-700 hover:bg-red-50"
+                      >
+                        Excluir
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {equalizacoes
+                    .filter((eq) => eq.id === ultimaEqualizacaoId)
+                    .map((eq) => (
+                      <div key={eq.id} className="space-y-2 rounded-xl border border-amber-100 bg-white p-3">
+                        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                          <div className="text-sm font-semibold text-zinc-900">Fornecedor escolhido</div>
+                          <div className="text-sm font-semibold text-emerald-700">
+                            {eq.fornecedorSelecionado.nome} · {brl(eq.fornecedorSelecionado.total)}
                           </div>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-2">
+                          {eq.propostas.map((p) => (
+                            <div key={p.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="text-sm font-semibold text-zinc-900">{p.nome}</div>
+                                  <div className="text-xs text-zinc-600">{p.itens} item(s)</div>
+                                </div>
+                                <div className="text-sm font-semibold text-zinc-800">{brl(p.total)}</div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
-
-                    <button
-                      type="button"
-                      onClick={() => adicionarItem(setPropostas, proposta.id)}
-                      className="inline-flex items-center rounded-2xl border border-dashed border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-zinc-400"
-                    >
-                      + Adicionar item
-                    </button>
-                  </div>
                 </div>
-              ))}
-
-              <datalist id="insumos-catalogo">
-                {insumos.slice(0, 200).map((i) => (
-                  <option key={i.codigo} value={`${i.codigo} · ${i.descricao}`} />
-                ))}
-              </datalist>
-
-              <div className="text-xs text-zinc-500">
-                {carregandoInsumos
-                  ? "Carregando insumos para vincular..."
-                  : insumosErro
-                  ? insumosErro
-                  : insumos.length > 0
-                  ? `${insumos.length} insumos disponíveis para seleção.`
-                  : "Nenhum insumo encontrado."}
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                {propostas.map((proposta, idx) => (
+                  <div key={proposta.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div className="flex-1">
+                        <label className="text-sm font-semibold text-zinc-900">Fornecedor</label>
+                        <Input
+                          value={proposta.fornecedor}
+                          onChange={(v) => atualizarFornecedor(setPropostas, proposta.id, v)}
+                          placeholder="Nome do fornecedor da proposta"
+                        />
+                      </div>
+                      <div className="text-sm font-semibold text-zinc-800">
+                        Total da proposta: {brl(propostaTotais[idx] ?? 0)}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 space-y-3">
+                      {proposta.items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-3 md:grid-cols-6 md:items-end"
+                        >
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-semibold text-zinc-700">Item/insumo cotado</label>
+                            <input
+                              value={item.insumo}
+                              onChange={(e) => atualizarItem(setPropostas, proposta.id, item.id, { insumo: e.target.value })}
+                              list="insumos-catalogo"
+                              placeholder="Busque pelo nome ou código"
+                              className="mt-1 h-10 w-full rounded-2xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-zinc-700">Unidade de medida</label>
+                            <Input
+                              value={item.unidadeMedida}
+                              onChange={(v) =>
+                                atualizarItem(setPropostas, proposta.id, item.id, { unidadeMedida: v })
+                              }
+                              placeholder="m², un, kg..."
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-zinc-700">Quantidade</label>
+                            <Input
+                              value={item.quantidade}
+                              onChange={(v) => atualizarItem(setPropostas, proposta.id, item.id, { quantidade: v })}
+                              placeholder="0"
+                              type="number"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-zinc-700">Valor unitário</label>
+                            <Input
+                              value={item.valorUnitario}
+                              onChange={(v) => atualizarItem(setPropostas, proposta.id, item.id, { valorUnitario: v })}
+                              placeholder="0,00"
+                              type="number"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-zinc-700">Subtotal</label>
+                            <div className="mt-1 h-10 rounded-2xl border border-zinc-200 bg-zinc-100 px-3 text-sm leading-10 text-zinc-900">
+                              {brl(calcularTotalItem(item.quantidade, item.valorUnitario))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => adicionarItem(setPropostas, proposta.id)}
+                        className="inline-flex items-center rounded-2xl border border-dashed border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-zinc-400"
+                      >
+                        + Adicionar item
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <datalist id="insumos-catalogo">
+                  {insumos.slice(0, 200).map((i) => (
+                    <option key={i.codigo} value={`${i.codigo} · ${i.descricao}`} />
+                  ))}
+                </datalist>
+
+                <div className="text-xs text-zinc-500">
+                  {carregandoInsumos
+                    ? "Carregando insumos para vincular..."
+                    : insumosErro
+                    ? insumosErro
+                    : insumos.length > 0
+                    ? `${insumos.length} insumos disponíveis para seleção.`
+                    : "Nenhum insumo encontrado."}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 flex flex-wrap justify-end gap-3">
@@ -408,9 +525,27 @@ export default function AnaliseNovo() {
                   <div className="text-sm font-semibold text-zinc-900">{eq.servico}</div>
                   <div className="text-xs text-zinc-500">Equalização salva em {formatarData(eq.criadoEm)}</div>
                 </div>
-                <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-                  {eq.fornecedorSelecionado.nome} — {brl(eq.fornecedorSelecionado.total)} (selecionado)
+                <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:gap-3">
+                  <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                    {eq.fornecedorSelecionado.nome} — {brl(eq.fornecedorSelecionado.total)} (selecionado)
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEditarEqualizacao(eq)}
+                      className="h-9 rounded-2xl border border-zinc-300 px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                    >
+                      Editar equalização
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExcluirEqualizacao(eq.id)}
+                      className="h-9 rounded-2xl border border-red-200 px-3 text-xs font-semibold text-red-700 hover:bg-red-50"
+                    >
+                      Excluir
+                    </button>
+                  </div>
                 </div>
               </div>
 
