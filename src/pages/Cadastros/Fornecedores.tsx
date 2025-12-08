@@ -10,7 +10,7 @@ export default function Fornecedores() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fornecedores, setFornecedores] = useState<{ id: string; codigo: string; nome: string }[]>([]);
+  const [fornecedores, setFornecedores] = useState<{ codigo: string; nome: string }[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -28,10 +28,10 @@ export default function Fornecedores() {
       setError(null);
 
       const { data, error: supaError } = await supabase
-        .from("fornecedores")
-        .select("id, codigo, nome")
-        .eq("company_id", companyId)
-        .order("codigo", { ascending: true });
+        .from("334-ITENS INSUMOS PROCESSOS")
+        .select('"CodFornProc", "Nome_Pes", uau_import_batches!inner(company_id)', { distinct: true })
+        .eq("uau_import_batches.company_id", companyId)
+        .order("CodFornProc", { ascending: true });
 
       if (supaError) {
         setError(supaError.message);
@@ -39,7 +39,19 @@ export default function Fornecedores() {
         return;
       }
 
-      setFornecedores(data ?? []);
+      const unique = new Map<string, { codigo: string; nome: string }>();
+
+      (data ?? []).forEach((row) => {
+        const codigo = (row.CodFornProc ?? "").trim();
+        const nome = (row.Nome_Pes ?? "").trim();
+
+        if (!codigo || !nome) return;
+        if (!unique.has(codigo)) {
+          unique.set(codigo, { codigo, nome });
+        }
+      });
+
+      setFornecedores(Array.from(unique.values()).sort((a, b) => a.codigo.localeCompare(b.codigo)));
       setLoading(false);
     }
 
