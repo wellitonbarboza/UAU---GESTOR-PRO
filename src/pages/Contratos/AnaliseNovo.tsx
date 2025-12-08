@@ -13,6 +13,7 @@ type InsumoOption = { codigo: string; descricao: string };
 type ProposalItem = {
   id: string;
   insumo: string;
+  unidadeMedida: string;
   quantidade: string;
   valorUnitario: string;
 };
@@ -40,8 +41,16 @@ export default function AnaliseNovo() {
   const [servicoBusca, setServicoBusca] = useState("");
   const [insumos, setInsumos] = useState<InsumoOption[]>([]);
   const [propostas, setPropostas] = useState<Proposal[]>([
-    { id: uid(), fornecedor: "", items: [{ id: uid(), insumo: "", quantidade: "", valorUnitario: "" }] }
+    {
+      id: uid(),
+      fornecedor: "",
+      items: [{ id: uid(), insumo: "", unidadeMedida: "", quantidade: "", valorUnitario: "" }]
+    }
   ]);
+  const [analiseSalva, setAnaliseSalva] = useState(false);
+  const [resumoVisivel, setResumoVisivel] = useState(false);
+  const [fornecedorSelecionado, setFornecedorSelecionado] = useState<string | null>(null);
+  const [selecaoConfirmada, setSelecaoConfirmada] = useState(false);
 
   const existentes = useMemo(() => {
     return MOCK_CONTRATOS.filter((c) => (c.servicoDescricao || "").toUpperCase().includes(servicoBusca.toUpperCase()));
@@ -85,19 +94,37 @@ export default function AnaliseNovo() {
     );
   }, [propostas]);
 
-  const panorama = useMemo(() => {
-    const orcado = 188000;
-    const incc = 201500;
-    const cat = 215000;
+  const resumoFornecedores = useMemo(
+    () => propostas.map((p, idx) => ({ ...p, total: propostaTotais[idx] ?? 0 })),
+    [propostaTotais, propostas]
+  );
 
-    const incorridoExistente = existentes.reduce((s, c) => s + c.valorPago + c.valorAPagar, 0);
-    const novo = propostaTotais.reduce((s, t) => s + t, 0);
+  useEffect(() => {
+    if (!analiseSalva || fornecedorSelecionado) return;
 
-    const total = incorridoExistente + novo;
-    const desvio = total - incc;
+    const menor = resumoFornecedores.reduce<{ id: string; total: number } | null>((prev, curr) => {
+      if (!prev) return { id: curr.id, total: curr.total };
+      return curr.total < prev.total ? { id: curr.id, total: curr.total } : prev;
+    }, null);
 
-    return { orcado, incc, cat, incorridoExistente, novo, total, desvio };
-  }, [existentes, propostaTotais]);
+    if (menor) setFornecedorSelecionado(menor.id);
+  }, [analiseSalva, fornecedorSelecionado, resumoFornecedores]);
+
+  const handleSalvarAnalise = () => {
+    setAnaliseSalva(true);
+    setResumoVisivel(true);
+    setSelecaoConfirmada(false);
+  };
+
+  const handleEditarAnalise = () => {
+    setAnaliseSalva(false);
+    setResumoVisivel(false);
+    setSelecaoConfirmada(false);
+  };
+
+  const handleSalvarSelecao = () => {
+    setSelecaoConfirmada(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -167,7 +194,7 @@ export default function AnaliseNovo() {
                     {proposta.items.map((item) => (
                       <div
                         key={item.id}
-                        className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-3 md:grid-cols-5 md:items-end"
+                        className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-3 md:grid-cols-6 md:items-end"
                       >
                         <div className="md:col-span-2">
                           <label className="text-xs font-semibold text-zinc-700">Item/insumo cotado</label>
@@ -177,6 +204,16 @@ export default function AnaliseNovo() {
                             list="insumos-catalogo"
                             placeholder="Busque pelo nome ou código"
                             className="mt-1 h-10 w-full rounded-2xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-zinc-700">Unidade de medida</label>
+                          <Input
+                            value={item.unidadeMedida}
+                            onChange={(v) =>
+                              atualizarItem(setPropostas, proposta.id, item.id, { unidadeMedida: v })
+                            }
+                            placeholder="m², un, kg..."
                           />
                         </div>
                         <div>
@@ -235,22 +272,88 @@ export default function AnaliseNovo() {
             </div>
           </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-6">
-            <Resumo label="Orçado" value={brl(panorama.orcado)} />
-            <Resumo label="Orçado INCC" value={brl(panorama.incc)} />
-            <Resumo label="CAT" value={brl(panorama.cat)} />
-            <Resumo label="Incorrido existente" value={brl(panorama.incorridoExistente)} />
-            <Resumo label="Novo contrato" value={brl(panorama.novo)} />
-            <Resumo
-              label="Desvio vs INCC"
-              value={brl(panorama.desvio)}
-              tone={panorama.desvio <= 0 ? "ok" : "warn"}
-            />
+          <div className="mt-4 flex flex-wrap justify-end gap-3">
+            {analiseSalva ? (
+              <button
+                type="button"
+                onClick={handleEditarAnalise}
+                className="h-10 rounded-2xl border border-zinc-300 px-4 text-sm font-semibold text-zinc-700 hover:border-zinc-400"
+              >
+                Editar análise
+              </button>
+            ) : null}
+            <PrimaryButton onClick={handleSalvarAnalise}>
+              {analiseSalva ? "Salvar novamente" : "Salvar análise"}
+            </PrimaryButton>
+            {analiseSalva ? (
+              <button
+                type="button"
+                onClick={() => setResumoVisivel((prev) => !prev)}
+                className="h-10 rounded-2xl border border-zinc-300 px-4 text-sm font-semibold text-zinc-700 hover:border-zinc-400"
+              >
+                {resumoVisivel ? "Ocultar resumo" : "Resumir análise"}
+              </button>
+            ) : null}
           </div>
 
-          <div className="mt-4 flex justify-end">
-            <PrimaryButton onClick={() => alert("Protótipo: salvar análise no histórico")}>Salvar análise</PrimaryButton>
-          </div>
+          {resumoVisivel ? (
+            <div className="mt-4 space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-900">Resumo dos fornecedores</div>
+                  <div className="text-xs text-zinc-600">
+                    Revise cada proposta, escolha o fornecedor e salve essa seleção na análise.
+                  </div>
+                </div>
+                {selecaoConfirmada && fornecedorSelecionado ? (
+                  <div className="text-xs font-semibold text-emerald-700">
+                    Seleção salva: {rotuloFornecedor(resumoFornecedores, fornecedorSelecionado)}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                {resumoFornecedores.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex flex-col gap-1 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 hover:border-zinc-300 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="flex flex-1 items-start gap-3">
+                      <input
+                        type="radio"
+                        className="mt-1 h-4 w-4 border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+                        checked={fornecedorSelecionado === p.id}
+                        onChange={() => {
+                          setFornecedorSelecionado(p.id);
+                          setSelecaoConfirmada(false);
+                        }}
+                      />
+                      <div className="space-y-1">
+                        <div className="text-sm font-semibold text-zinc-900">
+                          {p.fornecedor?.trim() || "Fornecedor sem identificação"}
+                        </div>
+                        <div className="text-xs text-zinc-600">
+                          {p.items.length} item(s) orçados · Total da proposta {brl(p.total)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold text-zinc-800">{brl(p.total)}</div>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="text-xs text-zinc-600">
+                  {fornecedorSelecionado
+                    ? `O fornecedor selecionado será salvo na proposta criada.`
+                    : "Escolha um fornecedor para registrar na proposta."}
+                </div>
+                <PrimaryButton disabled={!fornecedorSelecionado} onClick={handleSalvarSelecao}>
+                  Salvar seleção do fornecedor
+                </PrimaryButton>
+              </div>
+            </div>
+          ) : null}
         </div>
       </Card>
 
@@ -278,19 +381,11 @@ export default function AnaliseNovo() {
   );
 }
 
-function Resumo({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
-  return (
-    <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-      <div className="text-xs text-zinc-500">{label}</div>
-      <div className={`mt-1 text-sm font-semibold ${tone === "warn" ? "text-amber-900" : tone === "ok" ? "text-emerald-800" : "text-zinc-900"}`}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function adicionarFornecedor(setPropostas: React.Dispatch<React.SetStateAction<Proposal[]>>) {
-  setPropostas((prev) => [...prev, { id: uid(), fornecedor: "", items: [{ id: uid(), insumo: "", quantidade: "", valorUnitario: "" }] }]);
+  setPropostas((prev) => [
+    ...prev,
+    { id: uid(), fornecedor: "", items: [{ id: uid(), insumo: "", unidadeMedida: "", quantidade: "", valorUnitario: "" }] }
+  ]);
 }
 
 function atualizarFornecedor(
@@ -305,7 +400,7 @@ function adicionarItem(setPropostas: React.Dispatch<React.SetStateAction<Proposa
   setPropostas((prev) =>
     prev.map((p) =>
       p.id === propostaId
-        ? { ...p, items: [...p.items, { id: uid(), insumo: "", quantidade: "", valorUnitario: "" }] }
+        ? { ...p, items: [...p.items, { id: uid(), insumo: "", unidadeMedida: "", quantidade: "", valorUnitario: "" }] }
         : p
     )
   );
@@ -337,4 +432,10 @@ function parseNumero(valor: string) {
   const normalizado = valor.replace(/\./g, "").replace(/,/g, ".");
   const n = Number(normalizado);
   return Number.isFinite(n) ? n : 0;
+}
+
+function rotuloFornecedor(propostas: { id: string; fornecedor: string; total: number }[], id: string) {
+  const alvo = propostas.find((p) => p.id === id);
+  if (!alvo) return "Fornecedor selecionado";
+  return alvo.fornecedor?.trim() || `Fornecedor ${propostas.indexOf(alvo) + 1}`;
 }
