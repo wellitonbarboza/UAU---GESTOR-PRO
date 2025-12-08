@@ -8,6 +8,18 @@ export type Obra = {
   atualizadoEm: string;
 };
 
+export type ContratoItem = {
+  item: string;
+  planejamentoItem?: string;
+  servicoCodigo: string;
+  servicoDescricao: string;
+  unidade: string;
+  quantidade: number;
+  precoUnitario: number;
+  quantidadeMedida: number;
+  quantidadeAMedir: number;
+};
+
 export type Contrato = {
   numero: string;
   objeto: string;
@@ -21,6 +33,7 @@ export type Contrato = {
   valorPago: number;
   servicoCodigo?: string;
   servicoDescricao?: string;
+  itens: ContratoItem[];
 };
 
 export type ProcessoSemContrato = {
