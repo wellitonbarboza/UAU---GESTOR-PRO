@@ -51,7 +51,9 @@ export default function AnaliseNovo() {
 
   useEffect(() => {
     async function carregarServicos() {
-      if (!isSupabaseEnabled || !supabase) {
+      const client = supabase;
+
+      if (!isSupabaseEnabled || !client) {
         setServicosErro("Configure o Supabase para pesquisar serviços reais.");
         return;
       }
@@ -65,8 +67,8 @@ export default function AnaliseNovo() {
       setServicosErro(null);
 
       try {
-        const rows = await fetchAllSupabasePages<PlanejamentoRow & { uau_import_batches: { company_id: string } }>((from, to) => {
-          const query = supabase
+        const rows = await fetchAllSupabasePages<PlanejamentoRow & { uau_import_batches: { company_id: string }[] }>((from, to) => {
+          const query = client
             .from("223-PLANEJ.CONTRA.INSUMOS")
             .select('"ItemPl", "ServiçoPl", "DescriçãoItem", uau_import_batches!inner(company_id)')
             .eq("uau_import_batches.company_id", companyId)
@@ -102,7 +104,9 @@ export default function AnaliseNovo() {
 
   useEffect(() => {
     async function carregarInsumos() {
-      if (!isSupabaseEnabled || !supabase) {
+      const client = supabase;
+
+      if (!isSupabaseEnabled || !client) {
         setInsumosErro("Configure o Supabase para consultar o catálogo de insumos.");
         return;
       }
@@ -116,9 +120,9 @@ export default function AnaliseNovo() {
       setInsumosErro(null);
 
       try {
-        const catalogRows = await fetchAllSupabasePages<{ codigo: string; descricao: string; uau_import_batches?: { company_id: string } }>(
+        const catalogRows = await fetchAllSupabasePages<{ codigo: string; descricao: string; uau_import_batches?: { company_id: string }[] }>(
           (from, to) =>
-            supabase
+            client
               .from("insumos")
               .select("codigo, descricao, uau_import_batches!inner(company_id)")
               .eq("uau_import_batches.company_id", companyId)
@@ -136,9 +140,9 @@ export default function AnaliseNovo() {
 
         if (unique.size === 0 && obraId) {
           const legacyRows = await fetchAllSupabasePages<
-            { "CodInsProcItem": string; "DescrItens": string; uau_import_batches: { company_id: string } }
+            { "CodInsProcItem": string; "DescrItens": string; uau_import_batches: { company_id: string }[] }
           >((from, to) =>
-            supabase
+            client
               .from("334-ITENS INSUMOS PROCESSOS")
               .select('"CodInsProcItem", "DescrItens", uau_import_batches!inner(company_id)')
               .eq("uau_import_batches.company_id", companyId)
