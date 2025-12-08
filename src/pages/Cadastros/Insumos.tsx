@@ -50,7 +50,7 @@ export default function Insumos() {
       setError(null);
 
         const { data, error: supaError } = await supabase
-          .from('"334-ITENS INSUMOS PROCESSOS"')
+          .from("334-ITENS INSUMOS PROCESSOS")
           .select("CodInsProcItem, DescrItens, UnidProcItem, CategItens, Desc_CGer")
         .eq("company_id", companyId)
         .eq("obra_id", obraId)
