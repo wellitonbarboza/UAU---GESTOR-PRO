@@ -3,70 +3,16 @@ import { Search } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import { useAppStore } from "../../store/useAppStore";
-import { isSupabaseEnabled, supabase } from "../../lib/supabaseClient";
-import { fetchAllSupabasePages } from "../../lib/supabasePagination";
+import { useCatalogStore } from "../../store/useCatalogStore";
 
 export default function Fornecedores() {
   const { companyId } = useAppStore();
+  const { fornecedores, carregandoFornecedores, fornecedoresErro, loadFornecedores } = useCatalogStore();
   const [q, setQ] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fornecedores, setFornecedores] = useState<{ codigo: string; nome: string }[]>([]);
 
   useEffect(() => {
-    async function load() {
-      if (!isSupabaseEnabled || !supabase) {
-        setError("Configure o Supabase para carregar os fornecedores reais.");
-        return;
-      }
-
-      if (!companyId) {
-        setError("Empresa não encontrada na sessão. Faça login novamente.");
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      const client = supabase!;
-
-      try {
-        const data = await fetchAllSupabasePages<{ CodFornProc: string; Nome_Pes: string }>((from, to) =>
-          client
-            .from("334-ITENS INSUMOS PROCESSOS")
-            .select('"CodFornProc", "Nome_Pes", uau_import_batches!inner(company_id)')
-            .eq("uau_import_batches.company_id", companyId)
-            .order("CodFornProc", { ascending: true })
-            .range(from, to)
-        );
-
-        const unique = new Map<string, { codigo: string; nome: string }>();
-        const seenCodes = new Set<string>();
-        const seenNames = new Set<string>();
-
-        (data ?? []).forEach((row) => {
-          const codigo = (row.CodFornProc ?? "").trim();
-          const nome = (row.Nome_Pes ?? "").trim();
-
-          if (!codigo || !nome) return;
-          if (seenCodes.has(codigo) || seenNames.has(nome)) return;
-
-          seenCodes.add(codigo);
-          seenNames.add(nome);
-          unique.set(`${codigo}|${nome}`, { codigo, nome });
-        });
-
-        setFornecedores(Array.from(unique.values()).sort((a, b) => a.codigo.localeCompare(b.codigo)));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Falha ao carregar fornecedores.";
-        setError(msg);
-      }
-
-      setLoading(false);
-    }
-
-    load();
-  }, [companyId]);
+    loadFornecedores(companyId);
+  }, [companyId, loadFornecedores]);
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -91,14 +37,14 @@ export default function Fornecedores() {
               className="h-10 w-full rounded-2xl border border-zinc-200 bg-white pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
             />
           </div>
-          {error ? <div className="text-sm text-amber-700">{error}</div> : null}
+          {fornecedoresErro ? <div className="text-sm text-amber-700">{fornecedoresErro}</div> : null}
         </div>
       </div>
 
       <Card
         title="Fornecedores"
         subtitle="Cadastro vindo do UAU (CodFornProc/Nome_Pes)"
-        right={loading ? <div className="text-xs text-zinc-500">Carregando...</div> : null}
+        right={carregandoFornecedores ? <div className="text-xs text-zinc-500">Carregando...</div> : null}
       >
         <Table
           columns={[
@@ -107,7 +53,11 @@ export default function Fornecedores() {
           ]}
           rows={list.map((f) => ({ codigo: f.codigo, nome: f.nome }))}
           emptyMessage={
-            loading ? "Carregando fornecedores..." : error ? "Não foi possível carregar os fornecedores." : "Nenhum fornecedor encontrado."
+            carregandoFornecedores
+              ? "Carregando fornecedores..."
+              : fornecedoresErro
+              ? "Não foi possível carregar os fornecedores."
+              : "Nenhum fornecedor encontrado."
           }
         />
       </Card>
