@@ -14,8 +14,16 @@ type InsumoRow = {
   desc_cat: string | null;
 };
 
+type SupabaseInsumoRow = {
+  CodInsProcItem: string;
+  DescrItens: string;
+  UnidProcItem: string | null;
+  CategItens: string | null;
+  Desc_CGer: string | null;
+};
+
 export default function Insumos() {
-  const { companyId } = useAppStore();
+  const { companyId, obraId } = useAppStore();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +41,20 @@ export default function Insumos() {
         return;
       }
 
+      if (!obraId) {
+        setError("Selecione uma obra para listar os insumos desta importação.");
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
       const { data, error: supaError } = await supabase
-        .from("insumos")
-        .select("id, codigo, descricao, un, cod_cat, desc_cat")
+        .from<SupabaseInsumoRow>('"334-ITENS INSUMOS PROCESSOS"')
+        .select("CodInsProcItem, DescrItens, UnidProcItem, CategItens, Desc_CGer")
         .eq("company_id", companyId)
-        .order("codigo", { ascending: true });
+        .eq("obra_id", obraId)
+        .order("CodInsProcItem", { ascending: true });
 
       if (supaError) {
         setError(supaError.message);
@@ -48,12 +62,21 @@ export default function Insumos() {
         return;
       }
 
-      setInsumos(data ?? []);
+      setInsumos(
+        (data ?? []).map((item) => ({
+          id: `${item.CodInsProcItem}-${obraId}`,
+          codigo: item.CodInsProcItem,
+          descricao: item.DescrItens,
+          un: item.UnidProcItem,
+          cod_cat: item.CategItens,
+          desc_cat: item.Desc_CGer
+        }))
+      );
       setLoading(false);
     }
 
     load();
-  }, [companyId]);
+  }, [companyId, obraId]);
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
