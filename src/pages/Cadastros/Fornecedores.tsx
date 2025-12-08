@@ -29,7 +29,7 @@ export default function Fornecedores() {
 
       const { data, error: supaError } = await supabase
         .from("334-ITENS INSUMOS PROCESSOS")
-        .select('"CodFornProc", "Nome_Pes", uau_import_batches!inner(company_id)', { distinct: true })
+        .select('"CodFornProc", "Nome_Pes", uau_import_batches!inner(company_id)')
         .eq("uau_import_batches.company_id", companyId)
         .order("CodFornProc", { ascending: true });
 
