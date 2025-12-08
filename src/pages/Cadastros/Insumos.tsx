@@ -51,11 +51,11 @@ export default function Insumos() {
 
         const { data, error: supaError } = await supabase
           .from("334-ITENS INSUMOS PROCESSOS")
-          .select("CodInsProcItem, DescrItens, UnidProcItem, CategItens, Desc_CGer")
-        .eq("company_id", companyId)
+          .select('"CodInsProcItem", "DescrItens", "UnidProcItem", "CategItens", "Desc_CGer", uau_import_batches!inner(company_id)')
+        .eq("uau_import_batches.company_id", companyId)
         .eq("obra_id", obraId)
         .order("CodInsProcItem", { ascending: true });
-
+   
       if (supaError) {
         setError(supaError.message);
         setLoading(false);
