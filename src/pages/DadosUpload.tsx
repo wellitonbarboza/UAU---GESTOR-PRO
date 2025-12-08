@@ -5,6 +5,8 @@ import StatusPill from "../components/ui/Status";
 import { PrimaryButton } from "../components/ui/Controls";
 import { isSupabaseEnabled, supabase } from "../lib/supabaseClient";
 import { useAppStore } from "../store/useAppStore";
+import { useNavigate } from "react-router-dom";
+import { paths } from "../routes/paths";
 
 type UploadStage = "idle" | "reading" | "saving" | "done" | "error";
 
@@ -32,6 +34,7 @@ export default function DadosUpload() {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const supabaseClient = useMemo(() => (isSupabaseEnabled ? supabase : null), []);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let active = true;
@@ -231,6 +234,7 @@ export default function DadosUpload() {
 
       setStage("done");
       addLog(`Lote ${batch.id} salvo no banco e no bucket uau-imports.`);
+      navigate(paths.cadastros.insumos);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro inesperado ao processar a planilha.";
       setError(msg);
