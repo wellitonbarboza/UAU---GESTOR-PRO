@@ -4,6 +4,7 @@ import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import { useAppStore } from "../../store/useAppStore";
 import { isSupabaseEnabled, supabase } from "../../lib/supabaseClient";
+import { fetchAllSupabasePages } from "../../lib/supabasePagination";
 
 type InsumoRow = {
   id: string;
@@ -49,31 +50,42 @@ export default function Insumos() {
       setLoading(true);
       setError(null);
 
-        const { data, error: supaError } = await supabase
-          .from("334-ITENS INSUMOS PROCESSOS")
-          .select('"CodInsProcItem", "DescrItens", "UnidProcItem", "CategItens", "Desc_CGer", uau_import_batches!inner(company_id)')
-        .eq("uau_import_batches.company_id", companyId)
-        .eq("obra_id", obraId)
-        .order("CodInsProcItem", { ascending: true });
-   
-      if (supaError) {
-        setError(supaError.message);
-        setLoading(false);
-        return;
+      const client = supabase!;
+
+      try {
+        const rows = await fetchAllSupabasePages<SupabaseInsumoRow>((from, to) =>
+          client
+            .from("334-ITENS INSUMOS PROCESSOS")
+            .select('"CodInsProcItem", "DescrItens", "UnidProcItem", "CategItens", "Desc_CGer", uau_import_batches!inner(company_id)')
+            .eq("uau_import_batches.company_id", companyId)
+            .eq("obra_id", obraId)
+            .order("CodInsProcItem", { ascending: true })
+            .range(from, to)
+        );
+
+        const unique = new Map<string, SupabaseInsumoRow>();
+
+        rows.forEach((item) => {
+          const codigo = item.CodInsProcItem?.trim();
+          if (!codigo || unique.has(codigo)) return;
+          unique.set(codigo, item);
+        });
+
+        setInsumos(
+          Array.from(unique.values()).map((item) => ({
+            id: `${item.CodInsProcItem}-${obraId}`,
+            codigo: item.CodInsProcItem,
+            descricao: item.DescrItens,
+            un: item.UnidProcItem,
+            cod_cat: item.CategItens,
+            desc_cat: item.Desc_CGer
+          }))
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Falha ao carregar insumos.";
+        setError(msg);
       }
 
-      const rows = (data ?? []) as SupabaseInsumoRow[];
-
-      setInsumos(
-        rows.map((item) => ({
-          id: `${item.CodInsProcItem}-${obraId}`,
-          codigo: item.CodInsProcItem,
-          descricao: item.DescrItens,
-          un: item.UnidProcItem,
-          cod_cat: item.CategItens,
-          desc_cat: item.Desc_CGer
-        }))
-      );
       setLoading(false);
     }
 
