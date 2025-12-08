@@ -86,9 +86,11 @@ export default function Insumos() {
           const legacyRows = await fetchAllSupabasePages<LegacySheetInsumoRow>((from, to) =>
             client
               .from("334-ITENS INSUMOS PROCESSOS")
-              .select('"CodInsProcItem", "DescrItens", "UnidProcItem", "CategItens", "Desc_CGer", uau_import_batches!inner(company_id)')
+              .select(
+                '"CodInsProcItem", "DescrItens", "UnidProcItem", "CategItens", "Desc_CGer", uau_import_batches!inner(obra_id, company_id)'
+              )
               .eq("uau_import_batches.company_id", companyId)
-              .eq("obra_id", obraId)
+              .eq("uau_import_batches.obra_id", obraId)
               .order("CodInsProcItem", { ascending: true })
               .range(from, to)
           );
