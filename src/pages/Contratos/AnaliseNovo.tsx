@@ -5,15 +5,8 @@ import StatusPill from "../../components/ui/Status";
 import { PrimaryButton, Input } from "../../components/ui/Controls";
 import { brl } from "../../lib/format";
 import { MOCK_CONTRATOS } from "../../mock/data";
-import { isSupabaseEnabled, supabase } from "../../lib/supabaseClient";
-import { fetchAllSupabasePages } from "../../lib/supabasePagination";
 import { useAppStore } from "../../store/useAppStore";
-
-type PlanejamentoRow = {
-  ItemPl: string | null;
-  "ServiçoPl": string | null;
-  "DescriçãoItem": string | null;
-};
+import { useCatalogStore } from "../../store/useCatalogStore";
 
 type InsumoOption = { codigo: string; descricao: string };
 
@@ -34,13 +27,18 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toStr
 
 export default function AnaliseNovo() {
   const { companyId, obraId } = useAppStore();
+  const {
+    servicos,
+    carregandoServicos,
+    servicosErro,
+    loadServicos,
+    insumos: insumosCadastro,
+    carregandoInsumos,
+    insumosErro,
+    loadInsumos,
+  } = useCatalogStore();
   const [servicoBusca, setServicoBusca] = useState("");
-  const [servicosPlanejados, setServicosPlanejados] = useState<PlanejamentoRow[]>([]);
-  const [servicosErro, setServicosErro] = useState<string | null>(null);
-  const [carregandoServicos, setCarregandoServicos] = useState(false);
   const [insumos, setInsumos] = useState<InsumoOption[]>([]);
-  const [insumosErro, setInsumosErro] = useState<string | null>(null);
-  const [carregandoInsumos, setCarregandoInsumos] = useState(false);
   const [propostas, setPropostas] = useState<Proposal[]>([
     { id: uid(), fornecedor: "", items: [{ id: uid(), insumo: "", quantidade: "", valorUnitario: "" }] }
   ]);
@@ -50,141 +48,36 @@ export default function AnaliseNovo() {
   }, [servicoBusca]);
 
   useEffect(() => {
-    async function carregarServicos() {
-      const client = supabase;
-
-      if (!isSupabaseEnabled || !client) {
-        setServicosErro("Configure o Supabase para pesquisar serviços reais.");
-        return;
-      }
-
-      if (!companyId) {
-        setServicosErro("Empresa não encontrada na sessão. Faça login novamente.");
-        return;
-      }
-
-      setCarregandoServicos(true);
-      setServicosErro(null);
-
-      try {
-        const rows = await fetchAllSupabasePages<PlanejamentoRow & { uau_import_batches: { company_id: string }[] }>((from, to) => {
-          const query = client
-            .from("223-PLANEJ.CONTRA.INSUMOS")
-            .select('"ItemPl", "ServiçoPl", "DescriçãoItem", uau_import_batches!inner(company_id)')
-            .eq("uau_import_batches.company_id", companyId)
-            .range(from, to);
-
-          if (obraId) {
-            query.eq("obra_id", obraId);
-          }
-
-          return query;
-        });
-
-        const unique = new Map<string, PlanejamentoRow>();
-
-        rows.forEach((row) => {
-          const key = `${row.ItemPl ?? ""}|${row["ServiçoPl"] ?? ""}|${row["DescriçãoItem"] ?? ""}`.trim();
-          if (!key) return;
-          if (unique.has(key)) return;
-          unique.set(key, row);
-        });
-
-        setServicosPlanejados(Array.from(unique.values()));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Não foi possível carregar os serviços.";
-        setServicosErro(msg);
-      }
-
-      setCarregandoServicos(false);
-    }
-
-    carregarServicos();
-  }, [companyId, obraId]);
+    loadServicos(companyId, obraId || null);
+  }, [companyId, obraId, loadServicos]);
 
   useEffect(() => {
-    async function carregarInsumos() {
-      const client = supabase;
+    loadInsumos(companyId, obraId || null);
+  }, [companyId, obraId, loadInsumos]);
 
-      if (!isSupabaseEnabled || !client) {
-        setInsumosErro("Configure o Supabase para consultar o catálogo de insumos.");
-        return;
-      }
+  useEffect(() => {
+    const unique = new Map<string, InsumoOption>();
 
-      if (!companyId) {
-        setInsumosErro("Empresa não encontrada na sessão. Faça login novamente.");
-        return;
-      }
+    insumosCadastro.forEach((item) => {
+      const codigo = item.codigo?.trim();
+      if (!codigo || unique.has(codigo)) return;
+      unique.set(codigo, { codigo, descricao: item.descricao });
+    });
 
-      setCarregandoInsumos(true);
-      setInsumosErro(null);
-
-      try {
-        const catalogRows = await fetchAllSupabasePages<{ codigo: string; descricao: string; uau_import_batches?: { company_id: string }[] }>(
-          (from, to) =>
-            client
-              .from("insumos")
-              .select("codigo, descricao, uau_import_batches!inner(company_id)")
-              .eq("uau_import_batches.company_id", companyId)
-              .order("codigo", { ascending: true })
-              .range(from, to)
-        );
-
-        const unique = new Map<string, InsumoOption>();
-
-        catalogRows.forEach((item) => {
-          const codigo = item.codigo?.trim();
-          if (!codigo || unique.has(codigo)) return;
-          unique.set(codigo, { codigo, descricao: item.descricao });
-        });
-
-        if (unique.size === 0 && obraId) {
-          const legacyRows = await fetchAllSupabasePages<
-            { "CodInsProcItem": string; "DescrItens": string; uau_import_batches: { company_id: string }[] }
-          >((from, to) =>
-            client
-              .from("334-ITENS INSUMOS PROCESSOS")
-              .select('"CodInsProcItem", "DescrItens", uau_import_batches!inner(company_id)')
-              .eq("uau_import_batches.company_id", companyId)
-              .eq("obra_id", obraId)
-              .order("CodInsProcItem", { ascending: true })
-              .range(from, to)
-          );
-
-          legacyRows.forEach((item) => {
-            const codigo = item["CodInsProcItem"]?.trim();
-            if (!codigo || unique.has(codigo)) return;
-            unique.set(codigo, { codigo, descricao: item["DescrItens"] });
-          });
-        }
-
-        if (unique.size === 0) {
-          setInsumosErro("Nenhum insumo encontrado para pesquisar.");
-        }
-
-        setInsumos(Array.from(unique.values()));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Não foi possível carregar os insumos.";
-        setInsumosErro(msg);
-      }
-
-      setCarregandoInsumos(false);
-    }
-
-    carregarInsumos();
-  }, [companyId, obraId]);
+    setInsumos(Array.from(unique.values()));
+  }, [insumosCadastro]);
 
   const sugestoesServico = useMemo(() => {
     const termo = servicoBusca.trim().toLowerCase();
-    const base = servicosPlanejados.map((row) => ({
-      label: [row.ItemPl, row["ServiçoPl"], row["DescriçãoItem"]].filter(Boolean).join(" · "),
-      texto: `${row.ItemPl ?? ""} ${row["ServiçoPl"] ?? ""} ${row["DescriçãoItem"] ?? ""}`.toLowerCase()
+    const base = servicos.map((row) => ({
+      label: [row.item, row.servico, row.descricao].filter(Boolean).join(" · "),
+      texto: `${row.item ?? ""} ${row.servico ?? ""} ${row.descricao ?? ""}`.toLowerCase()
     }));
 
     if (!termo) return base.slice(0, 20);
 
     return base.filter((r) => r.texto.includes(termo)).slice(0, 20);
-  }, [servicoBusca, servicosPlanejados]);
+  }, [servicoBusca, servicos]);
 
   const propostaTotais = useMemo(() => {
     return propostas.map((p) =>
@@ -232,8 +125,8 @@ export default function AnaliseNovo() {
                   ? "Carregando serviços do Supabase..."
                   : servicosErro
                   ? servicosErro
-                  : servicosPlanejados.length > 0
-                  ? `${servicosPlanejados.length} itens disponíveis para busca.`
+                  : servicos.length > 0
+                  ? `${servicos.length} itens disponíveis para busca.`
                   : "Nenhum serviço encontrado."}
               </div>
             </div>

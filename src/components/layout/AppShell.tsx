@@ -26,6 +26,7 @@ import {
 
 import { paths } from "../../routes/paths";
 import { useAppStore } from "../../store/useAppStore";
+import { useCatalogStore } from "../../store/useCatalogStore";
 import { ADMIN_EMAIL } from "../../config/auth";
 import { isSupabaseEnabled, supabase } from "../../lib/supabaseClient";
 import StatusPill from "../ui/Status";
@@ -43,8 +44,10 @@ export default function AppShell() {
     setObras,
     setCompany,
     companyName,
+    companyId,
     user
   } = useAppStore();
+  const { loadFornecedores, loadInsumos, loadServicos } = useCatalogStore();
   const [loadingObras, setLoadingObras] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const obra = useMemo(() => obras.find((o) => o.id === obraId) ?? null, [obras, obraId]);
@@ -140,6 +143,14 @@ export default function AppShell() {
 
     bootstrap();
   }, [setCompany, setObraId, setObras]);
+
+  useEffect(() => {
+    if (!companyId) return;
+
+    loadFornecedores(companyId);
+    loadServicos(companyId, obraId || null);
+    loadInsumos(companyId, obraId || null);
+  }, [companyId, obraId, loadFornecedores, loadInsumos, loadServicos]);
 
   function exportar() {
     alert("Protótipo: exportar relatório/print (no app real: PDF/XLSX)");
