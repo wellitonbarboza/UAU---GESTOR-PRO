@@ -4,6 +4,7 @@ import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import { useAppStore } from "../../store/useAppStore";
 import { isSupabaseEnabled, supabase } from "../../lib/supabaseClient";
+import { fetchAllSupabasePages } from "../../lib/supabasePagination";
 
 export default function Fornecedores() {
   const { companyId } = useAppStore();
@@ -27,35 +28,40 @@ export default function Fornecedores() {
       setLoading(true);
       setError(null);
 
-      const { data, error: supaError } = await supabase
-        .from("334-ITENS INSUMOS PROCESSOS")
-        .select('"CodFornProc", "Nome_Pes", uau_import_batches!inner(company_id)')
-        .eq("uau_import_batches.company_id", companyId)
-        .order("CodFornProc", { ascending: true });
+      const client = supabase!;
 
-      if (supaError) {
-        setError(supaError.message);
-        setLoading(false);
-        return;
+      try {
+        const data = await fetchAllSupabasePages<{ CodFornProc: string; Nome_Pes: string }>((from, to) =>
+          client
+            .from("334-ITENS INSUMOS PROCESSOS")
+            .select('"CodFornProc", "Nome_Pes", uau_import_batches!inner(company_id)')
+            .eq("uau_import_batches.company_id", companyId)
+            .order("CodFornProc", { ascending: true })
+            .range(from, to)
+        );
+
+        const unique = new Map<string, { codigo: string; nome: string }>();
+        const seenCodes = new Set<string>();
+        const seenNames = new Set<string>();
+
+        (data ?? []).forEach((row) => {
+          const codigo = (row.CodFornProc ?? "").trim();
+          const nome = (row.Nome_Pes ?? "").trim();
+
+          if (!codigo || !nome) return;
+          if (seenCodes.has(codigo) || seenNames.has(nome)) return;
+
+          seenCodes.add(codigo);
+          seenNames.add(nome);
+          unique.set(`${codigo}|${nome}`, { codigo, nome });
+        });
+
+        setFornecedores(Array.from(unique.values()).sort((a, b) => a.codigo.localeCompare(b.codigo)));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Falha ao carregar fornecedores.";
+        setError(msg);
       }
 
-      const unique = new Map<string, { codigo: string; nome: string }>();
-      const seenCodes = new Set<string>();
-      const seenNames = new Set<string>();
-
-      (data ?? []).forEach((row) => {
-        const codigo = (row.CodFornProc ?? "").trim();
-        const nome = (row.Nome_Pes ?? "").trim();
-
-        if (!codigo || !nome) return;
-        if (seenCodes.has(codigo) || seenNames.has(nome)) return;
-
-        seenCodes.add(codigo);
-        seenNames.add(nome);
-        unique.set(`${codigo}|${nome}`, { codigo, nome });
-      });
-
-      setFornecedores(Array.from(unique.values()).sort((a, b) => a.codigo.localeCompare(b.codigo)));
       setLoading(false);
     }
 
