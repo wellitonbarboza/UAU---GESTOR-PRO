@@ -24,6 +24,14 @@ type Proposal = {
   items: ProposalItem[];
 };
 
+type EqualizacaoSalva = {
+  id: string;
+  servico: string;
+  criadoEm: string;
+  fornecedorSelecionado: { id: string; nome: string; total: number };
+  propostas: { id: string; nome: string; total: number; itens: number }[];
+};
+
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
 export default function AnaliseNovo() {
@@ -51,6 +59,7 @@ export default function AnaliseNovo() {
   const [resumoVisivel, setResumoVisivel] = useState(false);
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState<string | null>(null);
   const [selecaoConfirmada, setSelecaoConfirmada] = useState(false);
+  const [equalizacoes, setEqualizacoes] = useState<EqualizacaoSalva[]>([]);
 
   const existentes = useMemo(() => {
     return MOCK_CONTRATOS.filter((c) => (c.servicoDescricao || "").toUpperCase().includes(servicoBusca.toUpperCase()));
@@ -111,6 +120,31 @@ export default function AnaliseNovo() {
   }, [analiseSalva, fornecedorSelecionado, resumoFornecedores]);
 
   const handleSalvarAnalise = () => {
+    if (analiseSalva && selecaoConfirmada && fornecedorSelecionado) {
+      const fornecedorAtual = resumoFornecedores.find((p) => p.id === fornecedorSelecionado);
+
+      if (fornecedorAtual) {
+        const novaEqualizacao: EqualizacaoSalva = {
+          id: uid(),
+          servico: servicoBusca?.trim() || "Serviço sem título",
+          criadoEm: new Date().toISOString(),
+          fornecedorSelecionado: {
+            id: fornecedorAtual.id,
+            nome: rotuloFornecedor(resumoFornecedores, fornecedorAtual.id),
+            total: fornecedorAtual.total
+          },
+          propostas: resumoFornecedores.map((p, idx) => ({
+            id: p.id,
+            nome: p.fornecedor?.trim() || `Fornecedor ${idx + 1}`,
+            total: p.total,
+            itens: p.items.length
+          }))
+        };
+
+        setEqualizacoes((prev) => [novaEqualizacao, ...prev]);
+      }
+    }
+
     setAnaliseSalva(true);
     setResumoVisivel(true);
     setSelecaoConfirmada(false);
@@ -342,22 +376,76 @@ export default function AnaliseNovo() {
                 ))}
               </div>
 
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="text-xs text-zinc-600">
+                {fornecedorSelecionado
+                  ? `O fornecedor selecionado será salvo na proposta criada.`
+                  : "Escolha um fornecedor para registrar na proposta."}
+              </div>
+              <PrimaryButton disabled={!fornecedorSelecionado} onClick={handleSalvarSelecao}>
+                Salvar seleção do fornecedor
+              </PrimaryButton>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </Card>
+
+    <Card
+      title="Equalização"
+      subtitle="Histórico das opções salvas na análise, mostrando o fornecedor escolhido e os totais das propostas"
+    >
+      {equalizacoes.length === 0 ? (
+        <div className="text-sm text-zinc-600">
+          Após selecionar o fornecedor e salvar novamente a análise, a equalização ficará registrada aqui como um card.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {equalizacoes.map((eq) => (
+            <div key={eq.id} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="text-xs text-zinc-600">
-                  {fornecedorSelecionado
-                    ? `O fornecedor selecionado será salvo na proposta criada.`
-                    : "Escolha um fornecedor para registrar na proposta."}
+                <div>
+                  <div className="text-sm font-semibold text-zinc-900">{eq.servico}</div>
+                  <div className="text-xs text-zinc-500">Equalização salva em {formatarData(eq.criadoEm)}</div>
                 </div>
-                <PrimaryButton disabled={!fornecedorSelecionado} onClick={handleSalvarSelecao}>
-                  Salvar seleção do fornecedor
-                </PrimaryButton>
+                <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                  {eq.fornecedorSelecionado.nome} — {brl(eq.fornecedorSelecionado.total)} (selecionado)
+                </div>
+              </div>
+
+              <div className="grid gap-2 md:grid-cols-2">
+                {eq.propostas.map((p) => {
+                  const selecionado = p.id === eq.fornecedorSelecionado.id;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`rounded-xl border p-3 ${
+                        selecionado ? "border-emerald-300 bg-emerald-50" : "border-zinc-200 bg-zinc-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="text-sm font-semibold text-zinc-900">{p.nome}</div>
+                          <div className="text-xs text-zinc-600">{p.itens} item(s) · {brl(p.total)}</div>
+                        </div>
+                        {selecionado ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800">
+                            Escolhido
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          ) : null}
+          ))}
         </div>
-      </Card>
+      )}
+    </Card>
 
-      <Card title="Contratos existentes na categoria" subtitle="O que já está vigente/finalizado (para evitar duplicidade e enxergar incorrido)">
+    <Card title="Contratos existentes na categoria" subtitle="O que já está vigente/finalizado (para evitar duplicidade e enxergar incorrido)">
         <Table
           columns={[
             { key: "numero", header: "Contrato" },
@@ -438,4 +526,10 @@ function rotuloFornecedor(propostas: { id: string; fornecedor: string; total: nu
   const alvo = propostas.find((p) => p.id === id);
   if (!alvo) return "Fornecedor selecionado";
   return alvo.fornecedor?.trim() || `Fornecedor ${propostas.indexOf(alvo) + 1}`;
+}
+
+function formatarData(valor: string) {
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return valor;
+  return data.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
