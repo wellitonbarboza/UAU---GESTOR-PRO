@@ -40,15 +40,19 @@ export default function Fornecedores() {
       }
 
       const unique = new Map<string, { codigo: string; nome: string }>();
+      const seenCodes = new Set<string>();
+      const seenNames = new Set<string>();
 
       (data ?? []).forEach((row) => {
         const codigo = (row.CodFornProc ?? "").trim();
         const nome = (row.Nome_Pes ?? "").trim();
 
         if (!codigo || !nome) return;
-        if (!unique.has(codigo)) {
-          unique.set(codigo, { codigo, nome });
-        }
+        if (seenCodes.has(codigo) || seenNames.has(nome)) return;
+
+        seenCodes.add(codigo);
+        seenNames.add(nome);
+        unique.set(`${codigo}|${nome}`, { codigo, nome });
       });
 
       setFornecedores(Array.from(unique.values()).sort((a, b) => a.codigo.localeCompare(b.codigo)));
