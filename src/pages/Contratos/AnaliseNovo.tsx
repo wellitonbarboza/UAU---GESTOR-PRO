@@ -261,65 +261,16 @@ export default function AnaliseNovo() {
             </div>
 
             {visualizacaoCompacta ? (
-              <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="rounded-2xl border border-zinc-200 bg-white p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-amber-900">Equalização salva</div>
-                    <div className="text-xs text-amber-800">
-                      Resumo das propostas preenchidas. Edite para reabrir fornecedores e insumos.
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold text-zinc-900">Propostas salvas</div>
+                    <div className="text-xs text-zinc-600">
+                      As informações de fornecedores e itens foram recolhidas. Use o card de equalização abaixo para revisar ou
+                      editar a seleção.
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    {ultimaEqualizacaoId ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const eq = equalizacoes.find((item) => item.id === ultimaEqualizacaoId);
-                          if (eq) handleEditarEqualizacao(eq);
-                        }}
-                        className="h-9 rounded-2xl border border-amber-300 px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100"
-                      >
-                        Editar equalização
-                      </button>
-                    ) : null}
-                    {ultimaEqualizacaoId ? (
-                      <button
-                        type="button"
-                        onClick={() => handleExcluirEqualizacao(ultimaEqualizacaoId)}
-                        className="h-9 rounded-2xl border border-red-200 px-3 text-xs font-semibold text-red-700 hover:bg-red-50"
-                      >
-                        Excluir
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {equalizacoes
-                    .filter((eq) => eq.id === ultimaEqualizacaoId)
-                    .map((eq) => (
-                      <div key={eq.id} className="space-y-2 rounded-xl border border-amber-100 bg-white p-3">
-                        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                          <div className="text-sm font-semibold text-zinc-900">Fornecedor escolhido</div>
-                          <div className="text-sm font-semibold text-emerald-700">
-                            {eq.fornecedorSelecionado.nome} · {brl(eq.fornecedorSelecionado.total)}
-                          </div>
-                        </div>
-                        <div className="grid gap-2 md:grid-cols-2">
-                          {eq.propostas.map((p) => (
-                            <div key={p.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <div className="text-sm font-semibold text-zinc-900">{p.nome}</div>
-                                  <div className="text-xs text-zinc-600">{p.itens} item(s)</div>
-                                </div>
-                                <div className="text-sm font-semibold text-zinc-800">{brl(p.total)}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                  <PrimaryButton onClick={() => setVisualizacaoCompacta(false)}>Reabrir propostas</PrimaryButton>
                 </div>
               </div>
             ) : (
