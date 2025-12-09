@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, FileDown, Search } from "lucide-react";
 import { FilterBar } from "../components/layout/FilterBar";
 import { Card } from "../components/ui/Card";
@@ -10,19 +10,202 @@ import { Input } from "../components/ui/Input";
 import Table from "../components/ui/Table";
 import { brl, pct } from "../utils/format";
 import { MOCK_CONTRATOS } from "../data/mock";
+import { isSupabaseEnabled, supabase } from "../lib/supabaseClient";
+import { useAppStore } from "../store/useAppStore";
+import type { Contrato, ContratoItem } from "../types/domain";
+
+type Contrato549Row = {
+  id: number;
+  obra_id: string;
+  Cod_cont: string | null;
+  Objeto_cont: string | null;
+  CodPes_cont: string | null;
+  Nome_pes: string | null;
+  StatusCont: string | null;
+  SituacaoCont: string | null;
+  Total: string | null;
+  ValorMedido: string | null;
+  TotalContrato: string | null;
+  TotalContrato2: string | null;
+  APag: string | null;
+  APagar: string | null;
+  Serv_itens: string | null;
+  Descr_itens: string | null;
+  Unid_itens: string | null;
+  Qtde_itens: string | null;
+  Preco_itens: string | null;
+  SubTotal: string | null;
+  Cod_DescI: string | null;
+  Descr_DescCon: string | null;
+  Taxa_DescI: string | null;
+  TaxaTot: string | null;
+  QtdeAcomp: string | null;
+  ValorAcomp: string | null;
+  QtdeAAcomp: string | null;
+  ValorAAcomp: string | null;
+  Item_itens: string | null;
+  CHAVECONTRATO: string | null;
+  batch?: { company_id: string; obra_id: string | null };
+};
+
+function parseNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const normalized = String(value)
+    .replace(/[^0-9,-\.]/g, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".");
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeStatus(raw: string | null): Contrato["status"] {
+  const value = (raw ?? "").toUpperCase();
+  if (value.startsWith("FINAL")) return "FINALIZADO";
+  if (value.startsWith("SUSP")) return "SUSPENSO";
+  return "VIGENTE";
+}
+
+function normalizeSituacao(raw: string | null): Contrato["situacao"] {
+  const value = (raw ?? "").toUpperCase();
+  if (value.includes("ENCERR")) return "ENCERRADO";
+  if (value.includes("BLOQ")) return "BLOQUEADO";
+  return "ATIVO";
+}
+
+function mapRowsToContratos(rows: Contrato549Row[]): Contrato[] {
+  const grouped = new Map<string, Contrato>();
+
+  rows.forEach((row) => {
+    const numero = row.Cod_cont ?? row.CHAVECONTRATO ?? `CONTRATO-${row.id}`;
+    const existing = grouped.get(numero);
+
+    const contratoBase: Contrato = existing ?? {
+      numero,
+      objeto: row.Objeto_cont ?? "",
+      fornecedorCodigo: row.CodPes_cont ?? "",
+      fornecedorNome: row.Nome_pes ?? "",
+      status: normalizeStatus(row.StatusCont),
+      situacao: normalizeSituacao(row.SituacaoCont),
+      valorTotal: parseNumber(row.TotalContrato ?? row.TotalContrato2 ?? row.SubTotal ?? 0),
+      valorMedido: parseNumber(row.ValorMedido ?? row.ValorAcomp ?? 0),
+      valorPago: parseNumber(row.Total ?? row.APag ?? 0),
+      valorAPagar: parseNumber(row.APagar ?? row.ValorAAcomp ?? 0),
+      servicoCodigo: row.Cod_DescI ?? row.Serv_itens ?? undefined,
+      servicoDescricao: row.Descr_DescCon ?? row.Descr_itens ?? undefined,
+      itens: [],
+    };
+
+    const item: ContratoItem = {
+      item: row.Item_itens ?? "",
+      planejamentoItem: row.Cod_DescI ?? undefined,
+      servicoCodigo: row.Serv_itens ?? row.Cod_DescI ?? "",
+      servicoDescricao: row.Descr_itens ?? row.Descr_DescCon ?? "",
+      unidade: row.Unid_itens ?? "",
+      quantidade: parseNumber(row.Qtde_itens),
+      precoUnitario: parseNumber(row.Preco_itens),
+      quantidadeMedida: parseNumber(row.QtdeAcomp),
+      quantidadeAMedir: parseNumber(row.QtdeAAcomp),
+    };
+
+    contratoBase.itens.push(item);
+    grouped.set(numero, contratoBase);
+  });
+
+  return Array.from(grouped.values());
+}
 
 export default function PageContratoConsulta() {
+  const { companyId, obraId } = useAppStore();
   const [q, setQ] = useState("");
   const [codigoContrato, setCodigoContrato] = useState("");
   const [status, setStatus] = useState("TODOS");
   const [servico, setServico] = useState("TODOS");
   const [planejamento, setPlanejamento] = useState("TODOS");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [contratos, setContratos] = useState<Contrato[]>(isSupabaseEnabled ? [] : MOCK_CONTRATOS);
+  const [dataSource, setDataSource] = useState<"supabase" | "mock">(isSupabaseEnabled ? "supabase" : "mock");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchContratos() {
+      if (!isSupabaseEnabled || !supabase || !companyId) {
+        setDataSource("mock");
+        setContratos(MOCK_CONTRATOS);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from("549-ITENS DOS CONTRATOS")
+        .select(
+          [
+            "id",
+            "obra_id",
+            '"Cod_cont"',
+            '"Objeto_cont"',
+            '"CodPes_cont"',
+            '"Nome_pes"',
+            '"StatusCont"',
+            '"SituacaoCont"',
+            '"Total"',
+            '"ValorMedido"',
+            '"TotalContrato"',
+            '"TotalContrato2"',
+            '"APag"',
+            '"APagar"',
+            '"Serv_itens"',
+            '"Descr_itens"',
+            '"Unid_itens"',
+            '"Qtde_itens"',
+            '"Preco_itens"',
+            '"SubTotal"',
+            '"Cod_DescI"',
+            '"Descr_DescCon"',
+            '"Taxa_DescI"',
+            '"TaxaTot"',
+            '"QtdeAcomp"',
+            '"ValorAcomp"',
+            '"QtdeAAcomp"',
+            '"ValorAAcomp"',
+            '"Item_itens"',
+            '"CHAVECONTRATO"',
+            "batch:uau_import_batches!inner(company_id, obra_id)",
+          ].join(", ")
+        )
+        .eq("batch.company_id", companyId)
+        .order("Cod_cont", { ascending: true });
+
+      if (fetchError) {
+        setError(fetchError.message);
+        setLoading(false);
+        return;
+      }
+
+      const rows = Array.isArray(data) ? (data as unknown as Contrato549Row[]) : [];
+      const filtered = rows.filter((row) => {
+        if (!obraId) return true;
+        return row.batch?.obra_id === obraId;
+      });
+
+      const mapped = mapRowsToContratos(filtered ?? []);
+      setContratos(mapped);
+      setDataSource("supabase");
+      setLoading(false);
+    }
+
+    fetchContratos();
+  }, [companyId, obraId]);
 
   const servicoOptions = useMemo(() => {
     const map = new Map<string, string>();
 
-    MOCK_CONTRATOS.forEach((c) => {
+    contratos.forEach((c) => {
       if (c.servicoCodigo) {
         map.set(c.servicoCodigo, c.servicoDescricao ?? c.servicoCodigo);
       }
@@ -36,12 +219,12 @@ export default function PageContratoConsulta() {
       { value: "TODOS", label: "Tipo de serviço: todos" },
       ...Array.from(map.entries()).map(([value, label]) => ({ value, label: `${value} · ${label}` }))
     ];
-  }, []);
+  }, [contratos]);
 
   const planejamentoOptions = useMemo(() => {
     const set = new Set<string>();
 
-    MOCK_CONTRATOS.forEach((c) => {
+    contratos.forEach((c) => {
       c.itens.forEach((i) => {
         if (i.planejamentoItem) {
           set.add(i.planejamentoItem);
@@ -53,13 +236,13 @@ export default function PageContratoConsulta() {
       { value: "TODOS", label: "Item do planejamento: todos" },
       ...Array.from(set.values()).map((value) => ({ value, label: value }))
     ];
-  }, []);
+  }, [contratos]);
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     const codigo = codigoContrato.trim().toLowerCase();
 
-    return MOCK_CONTRATOS.filter((c) => {
+    return contratos.filter((c) => {
       const okTexto =
         !t ||
         `${c.numero} ${c.fornecedorNome} ${c.fornecedorCodigo} ${c.objeto} ${c.servicoCodigo ?? ""} ${c.servicoDescricao ?? ""}`
@@ -74,7 +257,7 @@ export default function PageContratoConsulta() {
 
       return okTexto && okCodigo && okStatus && okServico && okPlanejamento;
     });
-  }, [codigoContrato, planejamento, q, servico, status]);
+  }, [codigoContrato, planejamento, q, servico, status, contratos]);
 
   const toggleExpanded = (numero: string) => {
     setExpanded((prev) => ({ ...prev, [numero]: !prev[numero] }));
@@ -126,6 +309,16 @@ export default function PageContratoConsulta() {
       />
 
       <Card title="Contratos" subtitle="Consulta detalhada com cabeçalho e itens (tabela 549 + medições)">
+        {dataSource === "mock" ? (
+          <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Exibindo dados de exemplo. Configure o Supabase para ver os valores reais da tabela 549.
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>
+        ) : null}
+
         <div className="space-y-3">
           {list.map((c) => {
             const perc = c.valorTotal ? c.valorMedido / c.valorTotal : 0;
@@ -250,7 +443,9 @@ export default function PageContratoConsulta() {
             );
           })}
 
-          {list.length === 0 ? <div className="text-sm text-zinc-500">Nenhum contrato encontrado.</div> : null}
+          {list.length === 0 ? (
+            <div className="text-sm text-zinc-500">{loading ? "Carregando dados..." : "Nenhum contrato encontrado."}</div>
+          ) : null}
         </div>
       </Card>
     </div>
