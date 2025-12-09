@@ -28,6 +28,7 @@ type Contrato549Row = {
   TotalContrato2: string | null;
   APag: string | null;
   APagar: string | null;
+  SaldoContrato: string | null;
   Serv_itens: string | null;
   Descr_itens: string | null;
   Unid_itens: string | null;
@@ -51,27 +52,24 @@ function parseNumber(value: unknown): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
 
-  const normalized = String(value)
-    .replace(/[^0-9,-\.]/g, "")
-    .replace(/\./g, "")
-    .replace(/,/g, ".");
+  const normalizedWithDots = String(value)
+    .replace(/\s+/g, "")
+    .replace(/,/g, ".")
+    .replace(/[^0-9.-]/g, "");
+
+  const parts = normalizedWithDots.split(".");
+  const normalized = parts.length > 1 ? `${parts.slice(0, -1).join("")}.${parts.at(-1)}` : normalizedWithDots;
 
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeStatus(raw: string | null): Contrato["status"] {
-  const value = (raw ?? "").toUpperCase();
-  if (value.startsWith("FINAL")) return "FINALIZADO";
-  if (value.startsWith("SUSP")) return "SUSPENSO";
-  return "VIGENTE";
-}
-
-function normalizeSituacao(raw: string | null): Contrato["situacao"] {
-  const value = (raw ?? "").toUpperCase();
-  if (value.includes("ENCERR")) return "ENCERRADO";
-  if (value.includes("BLOQ")) return "BLOQUEADO";
-  return "ATIVO";
+function getStatusTone(raw: string): "ok" | "warn" | "muted" | "danger" {
+  const value = raw.toUpperCase();
+  if (value.includes("VIG") || value.includes("ATIV")) return "ok";
+  if (value.includes("SUSP") || value.includes("BLOQ")) return "warn";
+  if (value.includes("ENCERR") || value.includes("FINAL")) return "muted";
+  return "muted";
 }
 
 function mapRowsToContratos(rows: Contrato549Row[]): Contrato[] {
@@ -87,12 +85,12 @@ function mapRowsToContratos(rows: Contrato549Row[]): Contrato[] {
       objeto: row.Objeto_cont ?? "",
       fornecedorCodigo: row.CodPes_cont ?? "",
       fornecedorNome: row.Nome_pes ?? "",
-      status: normalizeStatus(row.StatusCont),
-      situacao: normalizeSituacao(row.SituacaoCont),
+      status: row.SituacaoCont?.trim() ?? "",
+      situacao: row.SituacaoCont?.trim() ?? "",
       valorTotal: parseNumber(row.TotalContrato ?? row.TotalContrato2 ?? row.SubTotal ?? 0),
       valorMedido: parseNumber(row.ValorMedido ?? row.ValorAcomp ?? 0),
       valorPago: parseNumber(row.Total ?? row.APag ?? 0),
-      valorAPagar: parseNumber(row.APagar ?? row.ValorAAcomp ?? 0),
+      valorAPagar: parseNumber(row.SaldoContrato ?? row.APagar ?? row.ValorAAcomp ?? 0),
       servicoCodigo: row.Cod_DescI ?? row.Serv_itens ?? undefined,
       servicoDescricao: row.Descr_DescCon ?? row.Descr_itens ?? undefined,
       itens: [],
@@ -166,6 +164,7 @@ export default function PageContratoConsulta() {
             '"TotalContrato2"',
             '"APag"',
             '"APagar"',
+            '"SaldoContrato"',
             '"Serv_itens"',
             '"Descr_itens"',
             '"Unid_itens"',
@@ -285,7 +284,7 @@ export default function PageContratoConsulta() {
                     <div className="text-xs text-zinc-500">Contrato {c.numero}</div>
                     <div className="text-xs text-zinc-500">{c.objeto}</div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <StatusPill tone={c.situacao === "ATIVO" ? "ok" : "muted"} text={c.situacao} />
+                      <StatusPill tone={getStatusTone(c.status)} text={c.status || "Sem status"} />
                     </div>
                   </div>
 

@@ -12,8 +12,8 @@ export type Contrato = {
   objeto: string;
   fornecedorCodigo: string;
   fornecedorNome: string;
-  status: "VIGENTE" | "FINALIZADO" | "SUSPENSO";
-  situacao: "ATIVO" | "ENCERRADO" | "BLOQUEADO";
+  status: string;
+  situacao: string;
   valorTotal: number;
   valorMedido: number;
   valorAPagar: number;
