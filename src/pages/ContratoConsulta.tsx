@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, FileDown, Search } from "lucide-react";
 import { FilterBar } from "../components/layout/FilterBar";
 import { Card } from "../components/ui/Card";
-import { IconButton, PrimaryButton } from "../components/ui/Buttons";
-import { Select } from "../components/ui/Select";
+import { IconButton } from "../components/ui/Buttons";
 import { StatusPill } from "../components/ui/StatusPill";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { Input } from "../components/ui/Input";
@@ -77,6 +76,7 @@ function normalizeSituacao(raw: string | null): Contrato["situacao"] {
 
 function mapRowsToContratos(rows: Contrato549Row[]): Contrato[] {
   const grouped = new Map<string, Contrato>();
+  const itemKeysByContrato = new Map<string, Set<string>>();
 
   rows.forEach((row) => {
     const numero = row.Cod_cont ?? row.CHAVECONTRATO ?? `CONTRATO-${row.id}`;
@@ -106,11 +106,21 @@ function mapRowsToContratos(rows: Contrato549Row[]): Contrato[] {
       unidade: row.Unid_itens ?? "",
       quantidade: parseNumber(row.Qtde_itens),
       precoUnitario: parseNumber(row.Preco_itens),
+      subtotal: parseNumber(row.SubTotal),
       quantidadeMedida: parseNumber(row.QtdeAcomp),
+      valorMedido: parseNumber(row.ValorAcomp),
       quantidadeAMedir: parseNumber(row.QtdeAAcomp),
+      valorAMedir: parseNumber(row.ValorAAcomp),
     };
 
-    contratoBase.itens.push(item);
+    const key = `${item.item}||${item.servicoCodigo}||${item.servicoDescricao}`;
+    const itemKeys = itemKeysByContrato.get(numero) ?? new Set<string>();
+
+    if (!itemKeys.has(key)) {
+      contratoBase.itens.push(item);
+      itemKeys.add(key);
+      itemKeysByContrato.set(numero, itemKeys);
+    }
     grouped.set(numero, contratoBase);
   });
 
@@ -121,9 +131,6 @@ export default function PageContratoConsulta() {
   const { companyId, obraId } = useAppStore();
   const [q, setQ] = useState("");
   const [codigoContrato, setCodigoContrato] = useState("");
-  const [status, setStatus] = useState("TODOS");
-  const [servico, setServico] = useState("TODOS");
-  const [planejamento, setPlanejamento] = useState("TODOS");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [contratos, setContratos] = useState<Contrato[]>(isSupabaseEnabled ? [] : MOCK_CONTRATOS);
   const [dataSource, setDataSource] = useState<"supabase" | "mock">(isSupabaseEnabled ? "supabase" : "mock");
@@ -202,42 +209,6 @@ export default function PageContratoConsulta() {
     fetchContratos();
   }, [companyId, obraId]);
 
-  const servicoOptions = useMemo(() => {
-    const map = new Map<string, string>();
-
-    contratos.forEach((c) => {
-      if (c.servicoCodigo) {
-        map.set(c.servicoCodigo, c.servicoDescricao ?? c.servicoCodigo);
-      }
-
-      c.itens.forEach((i) => {
-        map.set(i.servicoCodigo, i.servicoDescricao);
-      });
-    });
-
-    return [
-      { value: "TODOS", label: "Tipo de serviço: todos" },
-      ...Array.from(map.entries()).map(([value, label]) => ({ value, label: `${value} · ${label}` }))
-    ];
-  }, [contratos]);
-
-  const planejamentoOptions = useMemo(() => {
-    const set = new Set<string>();
-
-    contratos.forEach((c) => {
-      c.itens.forEach((i) => {
-        if (i.planejamentoItem) {
-          set.add(i.planejamentoItem);
-        }
-      });
-    });
-
-    return [
-      { value: "TODOS", label: "Item do planejamento: todos" },
-      ...Array.from(set.values()).map((value) => ({ value, label: value }))
-    ];
-  }, [contratos]);
-
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     const codigo = codigoContrato.trim().toLowerCase();
@@ -250,14 +221,10 @@ export default function PageContratoConsulta() {
           .includes(t);
 
       const okCodigo = !codigo || c.numero.toLowerCase().includes(codigo) || c.fornecedorCodigo.toLowerCase().includes(codigo);
-      const okStatus = status === "TODOS" || c.status === status;
-      const okServico =
-        servico === "TODOS" || c.servicoCodigo === servico || c.itens.some((i) => i.servicoCodigo === servico);
-      const okPlanejamento = planejamento === "TODOS" || c.itens.some((i) => i.planejamentoItem === planejamento);
 
-      return okTexto && okCodigo && okStatus && okServico && okPlanejamento;
+      return okTexto && okCodigo;
     });
-  }, [codigoContrato, planejamento, q, servico, status, contratos]);
+  }, [codigoContrato, q, contratos]);
 
   const toggleExpanded = (numero: string) => {
     setExpanded((prev) => ({ ...prev, [numero]: !prev[numero] }));
@@ -270,7 +237,7 @@ export default function PageContratoConsulta() {
       <FilterBar
         left={
           <>
-            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-5">
+            <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-3">
               <div className="relative md:col-span-2">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
                   <Search className="h-4 w-4" />
@@ -284,20 +251,6 @@ export default function PageContratoConsulta() {
               </div>
 
               <Input value={codigoContrato} onChange={(e) => setCodigoContrato(e.target.value)} placeholder="Código/contrato" />
-
-              <Select
-                value={status}
-                onChange={setStatus}
-                options={[
-                  { value: "TODOS", label: "Status: todos" },
-                  { value: "VIGENTE", label: "Vigente" },
-                  { value: "FINALIZADO", label: "Finalizado" },
-                  { value: "SUSPENSO", label: "Suspenso" },
-                ]}
-              />
-
-              <Select value={servico} onChange={setServico} options={servicoOptions} />
-              <Select value={planejamento} onChange={setPlanejamento} options={planejamentoOptions} />
             </div>
           </>
         }
@@ -308,7 +261,7 @@ export default function PageContratoConsulta() {
         }
       />
 
-      <Card title="Contratos" subtitle="Consulta detalhada com cabeçalho e itens (tabela 549 + medições)">
+      <Card title="Contratos" subtitle="Consulta detalhada com cabeçalho e itens (tabela 549)">
         {dataSource === "mock" ? (
           <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             Exibindo dados de exemplo. Configure o Supabase para ver os valores reais da tabela 549.
@@ -322,7 +275,6 @@ export default function PageContratoConsulta() {
         <div className="space-y-3">
           {list.map((c) => {
             const perc = c.valorTotal ? c.valorMedido / c.valorTotal : 0;
-            const saldo = c.valorTotal - c.valorMedido;
             return (
               <div key={c.numero} className="rounded-2xl border border-zinc-200 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -332,12 +284,8 @@ export default function PageContratoConsulta() {
                     </div>
                     <div className="text-xs text-zinc-500">Contrato {c.numero}</div>
                     <div className="text-xs text-zinc-500">{c.objeto}</div>
-                    <div className="text-xs text-zinc-500">
-                      Serviço {c.servicoCodigo} · {c.servicoDescricao}
-                    </div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <StatusPill tone={c.status === "VIGENTE" ? "ok" : "muted"} text={c.status} />
-                      <StatusPill tone="muted" text={c.situacao} />
+                      <StatusPill tone={c.situacao === "ATIVO" ? "ok" : "muted"} text={c.situacao} />
                     </div>
                   </div>
 
@@ -361,12 +309,8 @@ export default function PageContratoConsulta() {
                       </div>
                       <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-2">
                         <div className="text-zinc-500">Saldo do contrato</div>
-                        <div className="font-semibold">{brl(saldo)}</div>
+                        <div className="font-semibold">{brl(c.valorAPagar)}</div>
                       </div>
-                    </div>
-
-                    <div className="mt-3 flex justify-end">
-                      <PrimaryButton onClick={() => alert("Protótipo: abrir detalhes do contrato")}>Abrir contrato</PrimaryButton>
                     </div>
                   </div>
                 </div>
@@ -393,7 +337,7 @@ export default function PageContratoConsulta() {
                     <Table
                       columns={[
                         { key: "item", header: "Item" },
-                        { key: "servico", header: "Serv./insumo" },
+                        { key: "servico", header: "Código" },
                         { key: "descricao", header: "Descrição" },
                         { key: "unidade", header: "Un." },
                         { key: "quantidade", header: "Qtd contratada", align: "right" },
@@ -404,37 +348,19 @@ export default function PageContratoConsulta() {
                         { key: "qtdAMedir", header: "Qtd a medir", align: "right" },
                         { key: "valorAMedir", header: "Valor a medir", align: "right" },
                       ]}
-                      rows={c.itens.map((i) => {
-                        const subtotal = i.quantidade * i.precoUnitario;
-                        const valorMedidoItem = i.quantidadeMedida * i.precoUnitario;
-                        const valorAMedirItem = i.quantidadeAMedir * i.precoUnitario;
-
-                        return {
-                          item: (
-                            <div className="text-sm font-semibold">
-                              {i.item}
-                              {i.planejamentoItem ? (
-                                <div className="text-[11px] font-normal text-zinc-500">Item planejamento {i.planejamentoItem}</div>
-                              ) : null}
-                            </div>
-                          ),
-                          servico: (
-                            <div>
-                              <div className="text-sm font-semibold">{i.servicoCodigo}</div>
-                              <div className="text-xs text-zinc-500">{i.servicoDescricao}</div>
-                            </div>
-                          ),
-                          descricao: i.servicoDescricao,
-                          unidade: i.unidade,
-                          quantidade: formatQtd(i.quantidade),
-                          preco: brl(i.precoUnitario),
-                          subtotal: brl(subtotal),
-                          qtdMedida: formatQtd(i.quantidadeMedida),
-                          valorMedido: brl(valorMedidoItem),
-                          qtdAMedir: formatQtd(i.quantidadeAMedir),
-                          valorAMedir: brl(valorAMedirItem),
-                        };
-                      })}
+                      rows={c.itens.map((i) => ({
+                        item: <div className="text-sm font-semibold">{i.item}</div>,
+                        servico: <div className="text-sm font-semibold">{i.servicoCodigo}</div>,
+                        descricao: i.servicoDescricao,
+                        unidade: i.unidade,
+                        quantidade: formatQtd(i.quantidade),
+                        preco: brl(i.precoUnitario),
+                        subtotal: brl(i.subtotal),
+                        qtdMedida: formatQtd(i.quantidadeMedida),
+                        valorMedido: brl(i.valorMedido),
+                        qtdAMedir: formatQtd(i.quantidadeAMedir),
+                        valorAMedir: brl(i.valorAMedir),
+                      }))}
                       emptyMessage="Contrato sem itens cadastrados na 549"
                     />
                   ) : null}
