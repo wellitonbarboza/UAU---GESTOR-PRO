@@ -16,8 +16,11 @@ export type ContratoItem = {
   unidade: string;
   quantidade: number;
   precoUnitario: number;
+  subtotal: number;
   quantidadeMedida: number;
+  valorMedido: number;
   quantidadeAMedir: number;
+  valorAMedir: number;
 };
 
 export type Contrato = {
